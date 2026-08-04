@@ -1,0 +1,112 @@
+#!/bin/bash
+# MapAi — Essential Commands Reference
+# Keep this handy for quick deployment
+
+echo "🚀 MapAi Deployment Commands Reference"
+echo "========================================"
+echo ""
+
+# === LOCAL DEVELOPMENT ===
+echo "📱 LOCAL ANDROID DEVELOPMENT"
+echo "---"
+echo "# Build APK locally"
+echo "./workflow.sh build"
+echo ""
+echo "# Start backend locally"
+echo "cd backend && npm install && npm start"
+echo ""
+echo "# Check project status"
+echo "./workflow.sh status"
+echo ""
+
+# === SETUP & CONFIGURATION ===
+echo "⚙️  SETUP & CONFIGURATION"
+echo "---"
+echo "# Generate release keystore"
+echo "./config.sh generate-keystore"
+echo ""
+echo "# Setup GitHub Secrets automatically"
+echo "chmod +x setup-github-secrets.sh"
+echo "./setup-github-secrets.sh"
+echo ""
+echo "# Setup GitHub Pages"
+echo "# Go to: https://github.com/fevian448/Map-Ai/settings/pages"
+echo "# Source: GitHub Actions"
+echo ""
+
+# === DEPLOYMENT ===
+echo "🚀 DEPLOYMENT"
+echo "---"
+echo "# Push to GitHub (triggers auto-deploy)"
+echo "git push -u origin master"
+echo ""
+echo "# Monitor deployments"
+echo "# Actions: https://github.com/fevian448/Map-Ai/actions"
+echo "# Releases: https://github.com/fevian448/Map-Ai/releases"
+echo "# Web: https://fevian448.github.io/Map-Ai/"
+echo ""
+
+# === BACKEND DEPLOYMENT ===
+echo "🔧 BACKEND DEPLOYMENT (Pick One)"
+echo "---"
+echo "# Option 1: Render.com"
+echo "# Go to: https://render.com"
+echo "# Connect GitHub → Create Web Service"
+echo "# Command: cd backend && npm start"
+echo ""
+echo "# Option 2: Railway"
+echo "# Go to: https://railway.app"
+echo "# Connect GitHub → Auto-detect"
+echo ""
+echo "# Option 3: Docker"
+echo "docker build -t mapai-backend ./backend"
+echo "docker run -p 3000:3000 mapai-backend"
+echo ""
+
+# === QUICK LINKS ===
+echo "🔗 IMPORTANT LINKS"
+echo "---"
+echo "📖 Quick Start: GITHUB_QUICK_START.md"
+echo "📚 Full Docs: DOCUMENTATION.md"
+echo "🔐 Account Setup: DEVELOPER_ACCOUNT.md"
+echo "🚀 Deployment: FREE_DEPLOYMENT_GUIDE.md"
+echo "✅ Checklist: DEPLOYMENT_CHECKLIST.md"
+echo ""
+
+# === ACCOUNT ===
+echo "👤 DEVELOPER ACCOUNT"
+echo "---"
+echo "Email: fevianbenjo48@gmail.com"
+echo "Used for: Google Play, Google Cloud, GitHub, APIs"
+echo ""
+
+# === GITHUB SECRETS ===
+echo "🔐 GITHUB SECRETS NEEDED"
+echo "---"
+echo "Required:"
+echo "  - KEYSTORE_BASE64"
+echo "  - KEYSTORE_PASSWORD"
+echo "  - KEY_PASSWORD"
+echo "  - KEY_ALIAS"
+echo ""
+echo "Optional:"
+echo "  - GOOGLE_MAPS_API_KEY"
+echo "  - GOOGLE_PLAY_JSON"
+echo ""
+
+# === STATUS CHECK ===
+echo "✅ QUICK STATUS CHECK"
+echo "---"
+echo "# Verify Android build"
+echo "./gradlew clean && ./gradlew assembleDebug"
+echo ""
+echo "# Verify backend"
+echo "cd backend && npm install && npm start"
+echo ""
+echo "# Verify GitHub"
+echo "git status && git log --oneline -5"
+echo ""
+
+echo "========================================"
+echo "✨ Ready to deploy! 🎉"
+echo ""

@@ -1,0 +1,6 @@
+{
+  "name": "MapAi",
+  "description": "Android navigation app (Waze alternative) with live traffic alerts, speed cameras, route navigation, places, AI assistant, and SOS emergency tools.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

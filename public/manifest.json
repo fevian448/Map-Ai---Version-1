@@ -1,0 +1,17 @@
+{
+  "short_name": "MapAi",
+  "name": "MapAi — AI GPS Navigation & Live Traffic",
+  "description": "Universal Cross-Platform AI Navigation & Traffic App for Android, iOS, Windows, Linux, Huawei & Web",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#020617",
+  "theme_color": "#06b6d4",
+  "display": "standalone",
+  "orientation": "portrait"
+}

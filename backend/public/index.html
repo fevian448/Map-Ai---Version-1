@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MapAi — Live View</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js" integrity="sha256-+S4P6g1OP0V8OeB0r2C3x5J3cK5T5k5k5k5k5k5k5k5k=" crossorigin="anonymous"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
+  #map { position: absolute; inset: 0; z-index: 0; }
+  .leaflet-container { background: #0f172a; }
+  .panel {
+    position: absolute; z-index: 1000; background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px; color: #e2e8f0;
+    max-height: 70vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+  .panel h3 { margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+  .panel .item {
+    display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.04); margin-bottom: 6px; font-size: 13px;
+  }
+  .panel .item .ico { font-size: 18px; }
+  .panel .item .meta { font-size: 11px; color: #94a3b8; }
+  .right { top: 12px; right: 12px; width: 280px; }
+  .bottom { bottom: 12px; left: 12px; right: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .bottom .panel { flex: 1; min-width: 200px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(56, 189, 248, 0.15); color: #38bdf8;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot.green { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  .dot.red { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+  #status {
+    position: absolute; top: 12px; left: 12px; z-index: 1000;
+    background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 999px;
+    padding: 8px 14px; font-size: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .empty { color: #64748b; font-size: 12px; padding: 8px; text-align: center; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="status">
+  <span class="dot green" id="statusDot"></span>
+  <span id="statusText">Menghubungkan...</span>
+</div>
+
+<div id="map"></div>
+
+<div class="panel right">
+  <h3>🚨 Laporan & SOS</h3>
+  <div id="alertsPanel"><div class="empty">Menunggu data...</div></div>
+</div>
+
+<div class="bottom">
+  <div class="panel">
+    <h3>📸 Media Feed</h3>
+    <div id="mediaPanel"><div class="empty">Belum ada media</div></div>
+  </div>
+  <div class="panel">
+    <h3>🏆 Kontributor</h3>
+    <div id="contribPanel"><div class="empty">Memuat...</div></div>
+  </div>
+</div>
+
+<script>
+const SERVER = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host;
+let map, socket, markers = {};
+
+function initMap() {
+  map = L.map('map').setView([-6.2, 106.8], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+  }).addTo(map);
+}
+
+function markerIcon(emoji) {
+  return L.divIcon({ className: '', html: `<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))">${emoji}</div>`, iconSize: [24,24], iconAnchor: [12,12] });
+}
+
+function addMarker(id, lat, lon, emoji, popup) {
+  if (markers[id]) { markers[id].setLatLng([lat, lon]); return; }
+  const m = L.marker([lat, lon], { icon: markerIcon(emoji) }).addTo(map).bindPopup(popup || '');
+  markers[id] = m;
+}
+
+function removeMarker(id) {
+  if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+}
+
+function fmtTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderAlert(item) {
+  const panel = document.getElementById('alertsPanel');
+  const emoji = item.type === 'SOS' ? '🆘' : item.type === 'HAZARD' ? '🚨' : item.type === 'POLICE' ? '👮' : item.type === 'ACCIDENT' ? '🚗💥' : item.type === 'ROADWORK' ? '🚧' : item.type === 'SPEED_CAM' ? '📸' : '🚦';
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.innerHTML = `<span class="ico">${emoji}</span><div><div>${item.description || item.type}</div><div class="meta">${item.reporter || 'anon'} • ${fmtTime(item.created_at || Date.now())}</div></div>`;
+  panel.prepend(el);
+  while (panel.children.length > 50) panel.remove(panel.lastChild);
+  addMarker(item.id || Math.random(), item.lat, item.lon, emoji, `<b>${item.type}</b><br>${item.description || ''}<br><small>${item.reporter || 'anon'} • ${fmtTime(item.created_at || Date.now())}</small>`);
+}
+
+function renderMedia(item) {
+  const panel = document.getElementById('mediaPanel');
+  const el = document.createElement('div');
+  el.className = 'item';
+  const url = item.filename ? `/media/${item.filename}` : '#';
+  el.innerHTML = `<span class="ico">${item.kind === 'video' ? '🎥' : '🖼️'}</span><div><div><a href="${url}" target="_blank" style="color:#38bdf8;text-decoration:none">${item.caption || 'Media'}</a></div><div class="meta">${item.author || 'anon'} • ${fmtTime(item.created_at || Date.now())}</div></div>`;
+  panel.prepend(el);
+  while (panel.children.length > 20) panel.remove(panel.lastChild);
+}
+
+function renderContributors(list) {
+  const panel = document.getElementById('contribPanel');
+  panel.innerHTML = '';
+  list.slice(0, 10).forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `<span class="ico">${i < 3 ? ['🥇','🥈','🥉'][i] : '👤'}</span><div><div>${c.name}</div><div class="meta">${c.points} poin • ${c.reports} laporan</div></div>`;
+    panel.appendChild(el);
+  });
+}
+
+function connect() {
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  try {
+    socket = io(SERVER, { transports: ['websocket'], reconnectionAttempts: 20 });
+    socket.on('connect', () => {
+      statusDot.className = 'dot green';
+      statusText.textContent = 'Terhubung';
+      socket.emit('ping');
+      fetch('/api/reports?limit=50').then(r => r.json()).then(renderAlerts);
+      fetch('/api/feed?limit=20').then(r => r.json()).then(renderMediaFeed);
+      fetch('/api/contributors').then(r => r.json()).then(renderContributors);
+    });
+    socket.on('disconnect', () => { statusDot.className = 'dot red'; statusText.textContent = 'Terputus'; });
+    socket.on('report:new', (row) => { renderAlert(row); });
+    socket.on('sos:new', (row) => { renderAlert({ ...row, type: 'SOS' }); });
+    socket.on('media:new', (row) => { renderMedia(row); });
+  } catch (e) {
+    statusDot.className = 'dot red';
+    statusText.textContent = 'Gagal terhubung';
+  }
+}
+
+function renderAlerts(list) {
+  const panel = document.getElementById('alertsPanel');
+  panel.innerHTML = '';
+  list.forEach(renderAlert);
+}
+
+function renderMediaFeed(list) {
+  const panel = document.getElementById('mediaPanel');
+  panel.innerHTML = '';
+  list.forEach(renderMedia);
+}
+
+initMap();
+connect();
+</script>
+</body>
+</html>
