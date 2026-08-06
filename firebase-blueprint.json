@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and workspace sync state",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase user ID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "Profile picture URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["uid", "email"]
+    },
+    "SavedRoute": {
+      "title": "Saved Navigation Route",
+      "description": "User saved routes and trip destinations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Route ID" },
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "routeName": { "type": "string", "maxLength": 128, "description": "Custom name for route" },
+        "originName": { "type": "string", "maxLength": 128, "description": "Origin location name" },
+        "destinationName": { "type": "string", "maxLength": 128, "description": "Destination name" },
+        "originLat": { "type": "number", "description": "Origin latitude" },
+        "originLon": { "type": "number", "description": "Origin longitude" },
+        "destLat": { "type": "number", "description": "Destination latitude" },
+        "destLon": { "type": "number", "description": "Destination longitude" },
+        "distanceMeters": { "type": "number", "description": "Total route distance" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp created" }
+      },
+      "required": ["id", "userId", "routeName", "originName", "destinationName"]
+    },
+    "UserSetting": {
+      "title": "User Navigation Settings",
+      "description": "Preferences for navigation, audio, and workspace sync",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "language": { "type": "string", "description": "Selected language" },
+        "mapProvider": { "type": "string", "description": "Map provider" },
+        "voiceGuidance": { "type": "boolean", "description": "Voice guidance enabled" },
+        "autoDriveBackup": { "type": "boolean", "description": "Auto backup trip logs to Google Drive" },
+        "calendarSync": { "type": "boolean", "description": "Auto detect trip events from Google Calendar" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Updated timestamp" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile collection"
+    },
+    "/users/{userId}/saved_routes/{routeId}": {
+      "schema": { "$ref": "#/entities/SavedRoute" },
+      "description": "User saved navigation routes"
+    },
+    "/users/{userId}/settings/config": {
+      "schema": { "$ref": "#/entities/UserSetting" },
+      "description": "User configuration settings"
+    }
+  }
+}

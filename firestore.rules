@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['uid', 'email'])
+        && request.resource.data.uid == userId;
+      allow delete: if isOwner(userId);
+
+      // Subcollection: Saved Routes
+      match /saved_routes/{routeId} {
+        allow read, write: if isOwner(userId) && isValidId(routeId);
+      }
+
+      // Subcollection: Settings
+      match /settings/{configId} {
+        allow read, write: if isOwner(userId) && isValidId(configId);
+      }
+    }
+  }
+}

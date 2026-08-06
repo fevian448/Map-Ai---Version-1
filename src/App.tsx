@@ -42,7 +42,9 @@ import { TvInstallModal } from './components/TvInstallModal';
 import { AppBuilderStudioModal } from './components/AppBuilderStudioModal';
 import { FloatingAiCopilot } from './components/FloatingAiCopilot';
 import { GalleryVaultTab } from './components/GalleryVaultTab';
-import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as SettingsIcon, Smartphone, Tv, HardDrive, Camera } from 'lucide-react';
+import { GoogleWorkspaceHub } from './components/GoogleWorkspaceHub';
+import { GitLabHub } from './components/GitLabHub';
+import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as SettingsIcon, Smartphone, Tv, HardDrive, Camera, Sparkles, Gitlab } from 'lucide-react';
 import { t } from './lib/i18n';
 import { ActiveDriver } from './types';
 import { fetchActiveDrivers } from './services/api';
@@ -51,7 +53,7 @@ import { fetchActiveDrivers } from './services/api';
 const DEFAULT_LOCATION: GeoPoint = { latitude: -6.2088, longitude: 106.8456 };
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'map' | 'alerts' | 'drive' | 'tracker' | 'gallery' | 'explore' | 'chat' | 'sos' | 'profile' | 'settings'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'alerts' | 'drive' | 'tracker' | 'gallery' | 'explore' | 'chat' | 'sos' | 'profile' | 'settings' | 'workspace' | 'gitlab'>('map');
   const [activeDrivers, setActiveDrivers] = useState<ActiveDriver[]>([]);
 
   // System Logs & Telemetry
@@ -392,6 +394,24 @@ export function App() {
 
         {activeTab === 'profile' && <ProfileTab contributors={contributors} settings={settings} />}
 
+        {activeTab === 'workspace' && (
+          <GoogleWorkspaceHub
+            userLocation={userLocation}
+            destinationName={destinationName}
+            onSelectDestination={handleSelectDestination}
+            onStartNavigation={handleStartNavigation}
+            settings={settings}
+          />
+        )}
+
+        {activeTab === 'gitlab' && (
+          <GitLabHub
+            userLocation={userLocation}
+            destinationName={destinationName}
+            settings={settings}
+          />
+        )}
+
         {activeTab === 'settings' && (
           <SettingsTab
             settings={settings}
@@ -523,6 +543,27 @@ export function App() {
         >
           <Radio className="w-5 h-5 animate-pulse" />
           <span className="text-[10px] font-bold">{t('nav_sos', settings.language)}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('workspace')}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all relative ${
+            activeTab === 'workspace' ? 'text-cyan-400 scale-105 font-bold' : 'text-cyan-400/80 hover:text-cyan-300'
+          }`}
+        >
+          <Sparkles className="w-5 h-5 text-cyan-400" />
+          <span className="text-[10px] font-bold">Workspace</span>
+          <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+        </button>
+
+        <button
+          onClick={() => setActiveTab('gitlab')}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+            activeTab === 'gitlab' ? 'text-orange-400 scale-105 font-bold' : 'text-orange-400/80 hover:text-orange-300'
+          }`}
+        >
+          <Gitlab className="w-5 h-5 text-orange-400" />
+          <span className="text-[10px] font-bold">GitLab</span>
         </button>
 
         <button
