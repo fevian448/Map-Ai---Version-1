@@ -1,10 +1,11 @@
 # MapAi — Universal Cross-Platform AI GPS Navigation & Live Traffic
 
-**MapAi** is a cross-platform AI GPS navigation app and Waze alternative built with **React + TypeScript + Vite + Tailwind CSS** on the web frontend, **Kotlin + Jetpack Compose** for Android, and an Express + Socket.IO + SQLite backend server.
+**MapAi** is a cross-platform AI GPS navigation app and Waze alternative built with **React 18 + TypeScript + Vite + Tailwind CSS** on the web frontend, **Kotlin + Jetpack Compose** for Android, **Rust / Tauri** for high-performance desktop, and an Express + Socket.IO + SQLite backend server.
 
-It is designed to run seamlessly across all operating systems: **Android, iOS, Windows, Linux, Huawei (HarmonyOS), and Web browsers (as a PWA / web app)**.
+It is designed to run seamlessly across all operating systems: **Android, iOS, Windows, Linux, macOS, Huawei (HarmonyOS), and Smart TVs (Android TV, Fire TV, Apple TV, WebOS, Tizen)**.
 
-🚀 **Live Web View Demo:** [https://fevian448.github.io/Map-Ai/](https://fevian448.github.io/Map-Ai/)
+🚀 **Live Web View Demo:** [https://fevian448.github.io/Map-Ai/](https://fevian448.github.io/Map-Ai/)  
+📦 **GitHub Repository:** [https://github.com/fevian448/Map-Ai](https://github.com/fevian448/Map-Ai)
 
 ---
 
@@ -19,22 +20,22 @@ It is designed to run seamlessly across all operating systems: **Android, iOS, W
 | **Live Multi-Device Phone Tracker** | Real-time tracking of family members, fleet drivers, and express riders |
 | **Crowdsourced Traffic Alerts** | Real-time hazard reporting — police traps, traffic jams, accidents, roadworks, speed cameras — with confidence scoring |
 | **Smart Speedometer & Drive Tab** | Real-time GPS speedometer, speed limit warnings, road weather conditions, and speed camera alerts |
-| **Explore Nearby Points of Interest** | Filter nearby hubs for Fuel & EV charging, Dining, Parking, Hospitals, ATMs, and Maxim/Grab/Foodpanda delivery bays |
 | **Emergency SOS System** | Instant siren trigger, fake incoming call simulator, SMS/Call emergency contacts, and live location broadcasting |
-| **Cross-Platform PWA & Installable** | Full Web App Manifest & service worker capabilities for installation on Windows, iOS, Android, Linux, and Huawei |
+| **Studio Installation & Multi-Stack** | Clean Installation & Studio Build panel in Settings supporting **Gradle (Android), React (PWA), Rust (Tauri), Windows (.exe), and Smart TV** |
 
 ---
 
-## Universal Cross-Platform Compatibility
+## Universal Cross-Platform & Multi-Stack Builds
 
-MapAi supports **all devices and operating systems**:
+MapAi supports multiple build technologies tailored for every device and operating system:
 
-- **Android (APK & Web):** Native Kotlin + Jetpack Compose app or Chrome/Edge PWA.
-- **iOS (iPhone & iPad):** Safari PWA with home screen installation & full-screen navigation view.
-- **Windows (PC & Tablet):** Chrome, Edge, or Brave desktop PWA installation with native window frame.
-- **Linux (Ubuntu, Debian, Fedora, Arch):** Any modern WebKit/Chromium browser or Linux PWA desktop shortcut.
-- **Huawei (HarmonyOS & HMS):** Browser view & standalone Web App without Google Play dependency.
-- **Web Browsers:** Chrome, Safari, Firefox, Edge, Opera, and Vivaldi.
+| Technology Stack | Target Platform | Build Command / Output |
+|------------------|-----------------|------------------------|
+| **Gradle (Android / TV)** | Android 8.0+ Phone, Tablet, Android TV, Huawei HarmonyOS | `./workflow.sh build` → `app-debug.apk` |
+| **React 18 + Vite PWA** | Web Browsers, iOS Safari, Android Chrome, Edge | `npm run build` → PWA Web Manifest & Service Worker |
+| **Rust + Tauri** | Windows 10/11, macOS, Linux (Debian/Ubuntu/Fedora) | `cargo tauri build` → Lightweight native `.exe` / `.deb` / `.dmg` |
+| **Windows Executable** | Windows PCs, Laptops, Tablets | Installable PWA via Edge/Chrome or native Rust `.exe` |
+| **Smart TV Mode** | Android TV, Fire TV, LG WebOS, Samsung Tizen | 10ft remote-friendly D-Pad view & full-screen launcher |
 
 ---
 
@@ -47,15 +48,19 @@ MapAi supports **all devices and operating systems**:
 - **OpenStreetMap** tile servers & **OSRM** routing engine
 - **PWA Web Manifest** with standalone theme configuration
 
-### Android Native Module
+### Native Android Module
 - **Kotlin** + **Jetpack Compose** (Material 3)
 - **osmdroid** for offline-capable OpenStreetMap tiles
 - **Google Play Services Location** (FusedLocationProviderClient)
 - **Retrofit 2** + **Gson** for HTTP API communications
 - **Socket.IO Client** for push events
 
+### Desktop Native Module (Rust)
+- **Tauri 2** + **Rust Toolchain**
+- Native C++/Rust WebView2 binding (&lt;30MB memory footprint)
+
 ### Backend Server
-- **Node.js** + **Express.js** API proxy
+- **Node.js 20+** + **Express.js** API proxy
 - **better-sqlite3** with WAL (Write-Ahead Logging) mode
 - **Socket.IO** for WebSocket real-time push
 - **Gemini 3.6 Flash AI SDK** (`@google/genai`) for route & copilot responses
@@ -76,11 +81,13 @@ MapAi/
 │   │   ├── PhoneTrackerTab.tsx   # Multi-device GPS tracking
 │   │   ├── NasaWidget.tsx        # NASA TV Live & ISS telemetry tracking
 │   │   ├── AlertsTab.tsx         # Traffic hazards & crowd alerts
+│   │   ├── SettingsTab.tsx       # Studio Build & App Install launcher
+│   │   ├── TvInstallModal.tsx    # Multi-stack & TV installation guide
 │   │   └── SosTab.tsx            # Emergency SOS & siren simulator
 │   ├── services/                 # API client & backend proxy handlers
 │   ├── lib/                      # i18n & utilities
 │   └── types.ts                  # Shared TypeScript interfaces
-├── app/                          # Native Android app module
+├── app/                          # Native Android app module (Gradle)
 │   └── src/main/java/com/example/mapai/
 │       ├── data/                 # Models, repository & Retrofit client
 │       ├── location/             # Location tracking service
@@ -98,7 +105,7 @@ MapAi/
 
 ## Quick Start & Installation
 
-### 1. Web / Full-Stack Development
+### 1. Web Development & Preview
 ```bash
 # Clone the repository
 git clone https://github.com/fevian448/Map-Ai.git
@@ -113,7 +120,16 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
-### 2. Backend Server Deployment
+### 2. Android APK Build (Gradle)
+```bash
+# Build Android APK via Gradle wrapper
+./workflow.sh build
+# or run directly:
+./gradlew assembleDebug
+```
+Output location: `app/build/outputs/apk/debug/app-debug.apk`
+
+### 3. Backend Server Deployment
 ```bash
 # Start backend server locally
 cd backend
@@ -121,12 +137,11 @@ npm install
 npm start
 ```
 
-### 3. Android Debug APK Build
+### 4. GitHub Release & Push
 ```bash
-# Build Android APK via Gradle
-./workflow.sh build
+# Push commits and trigger workflow
+./workflow.sh push
 ```
-Output location: `app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
@@ -147,9 +162,9 @@ PORT=3000
 
 ---
 
-## Workflow Script Commands
+## Automation Script Commands
 
-MapAi includes a convenient automation script (`./workflow.sh`):
+MapAi includes a convenient workflow script (`./workflow.sh`):
 
 ```bash
 ./workflow.sh status   # Display git status, branch & build state

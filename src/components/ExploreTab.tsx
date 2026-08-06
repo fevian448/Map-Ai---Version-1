@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Place, PlaceCategory, PLACE_CATEGORIES, SettingsState } from '../types';
-import { Compass, MapPin, Star, Fuel, ExternalLink, Bike, UtensilsCrossed, ShieldAlert, Zap, Navigation } from 'lucide-react';
+import { Compass, MapPin, Star, Fuel, ExternalLink, Bike, UtensilsCrossed, ShieldAlert, Zap, Navigation, Store, Plus, CheckCircle2 } from 'lucide-react';
 import { NasaWidget } from './NasaWidget';
 
 interface ExploreTabProps {
@@ -20,6 +20,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 }) => {
   const [riderModeActive, setRiderModeActive] = useState<boolean>(true);
   const [activePartnerFilter, setActivePartnerFilter] = useState<'ALL' | 'MAXIM' | 'FOODPANDA' | 'GRAB'>('ALL');
+  const [showBusinessModal, setShowBusinessModal] = useState<boolean>(false);
+  const [businessSubmitted, setBusinessSubmitted] = useState<boolean>(false);
+  const [newShopName, setNewShopName] = useState('');
+  const [newShopCategory, setNewShopCategory] = useState('RESTAURANT');
+  const [newShopPromo, setNewShopPromo] = useState('');
 
   // Filter places if partner filter selected
   const filteredPlaces = places.filter((p) => {
@@ -35,8 +40,126 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     return true;
   });
 
+  const handleRegisterBusiness = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newShopName.trim()) return;
+
+    setBusinessSubmitted(true);
+    setTimeout(() => {
+      setShowBusinessModal(false);
+      setBusinessSubmitted(false);
+      setNewShopName('');
+      setNewShopPromo('');
+    }, 2000);
+  };
+
   return (
     <div id="explore-tab-screen" className="flex-1 bg-slate-950 text-slate-100 overflow-y-auto p-4 space-y-4 pb-24">
+      {/* Business Owner Quick Register Banner */}
+      <div className="bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/50 rounded-2xl p-3.5 shadow-xl flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-xl shrink-0">
+            🏪
+          </div>
+          <div>
+            <h3 className="text-xs font-extrabold text-amber-300">Peniaga & Kedai Local (Perniagaan)</h3>
+            <p className="text-[11px] text-slate-300">Daftar lokasi kedai & beri diskaun untuk pemandu & rider di MapAi!</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowBusinessModal(true)}
+          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 flex items-center gap-1 shadow-md transition-all active:scale-95"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Daftar Kedai</span>
+        </button>
+      </div>
+
+      {/* Business Registration Modal */}
+      {showBusinessModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/60 rounded-3xl p-5 max-w-md w-full space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-amber-400" />
+                <h2 className="text-sm font-bold text-white">Daftar Perniagaan & POI Kedai Local</h2>
+              </div>
+              <button
+                onClick={() => setShowBusinessModal(false)}
+                className="text-slate-400 hover:text-white text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {businessSubmitted ? (
+              <div className="py-8 text-center space-y-2">
+                <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
+                <h3 className="text-base font-bold text-white">Perniagaan Berjaya Didaftarkan!</h3>
+                <p className="text-xs text-slate-300">
+                  Lokasi kedai anda kini aktif di radar MapAi untuk pemandu, Maxim, Foodpanda & Grab riders.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleRegisterBusiness} className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Nama Perniagaan / Kedai *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newShopName}
+                    onChange={(e) => setNewShopName(e.target.value)}
+                    placeholder="Contoh: Restoran Selera Kampung / Bengkel Tayar Auto24"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Kategori Perniagaan</label>
+                  <select
+                    value={newShopCategory}
+                    onChange={(e) => setNewShopCategory(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none"
+                  >
+                    <option value="RESTAURANT">🍔 Makanan & Minuman / Restoran</option>
+                    <option value="FUEL">⛽ Stesen Minyak & Kedai Runcit</option>
+                    <option value="AUTOMOTIVE">🔧 Bengkel, Tayar & Service Kereta</option>
+                    <option value="SHOPPING">🛒 Pasar Raya & Kedai Runcit</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Promosi / Tawaran Diskaun Khas</label>
+                  <textarea
+                    rows={2}
+                    value={newShopPromo}
+                    onChange={(e) => setNewShopPromo(e.target.value)}
+                    placeholder="Contoh: Diskaun 15% untuk pemandu MapAi & Rider Foodpanda/Grab!"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowBusinessModal(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg"
+                  >
+                    Simpan & Aktifkan Kedai 🚀
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Maxim, Foodpanda & Grab Partner Feature Header Card */}
       <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-emerald-950/80 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 relative overflow-hidden">
         <div className="flex items-center justify-between">
@@ -288,3 +411,4 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     </div>
   );
 };
+

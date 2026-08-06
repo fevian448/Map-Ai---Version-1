@@ -11,7 +11,9 @@ import {
   Contributor,
   ChatMessage,
   CategoryKey,
-  TrafficLevel
+  TrafficLevel,
+  GeocodingResult,
+  AiProviderKey
 } from '../types';
 
 export function haversine(a: GeoPoint, b: GeoPoint): number {
@@ -92,6 +94,16 @@ export async function fetchAlerts(center: GeoPoint, radiusKm = 10): Promise<Traf
 
   // High quality default live traffic jam & hazard alerts centered on current location
   return [
+    {
+      id: 'jam_tracker_cluster',
+      type: 'TRAFFIC',
+      point: offsetPoint(center, 250, 45),
+      description: '🚦 Auto Traffic Alert: 48 Active Phone Trackers Detected in 500m Radius (Threshold 40-50 Phones Exceeded) — Jalan Sesak / Heavy Traffic Jam!',
+      reporter: 'PhoneTracker_ClusterRadar',
+      timestamp: Date.now() - 1 * 60000,
+      confidence: 100,
+      confirmedBy: 48
+    },
     {
       id: 'jam_live_1',
       type: 'TRAFFIC',
@@ -327,12 +339,48 @@ export async function fetchContributors(): Promise<Contributor[]> {
   return [];
 }
 
-export async function sendChatMessage(content: string): Promise<string> {
+export async function searchGeocoding(
+  query: string,
+  userLoc?: GeoPoint
+): Promise<GeocodingResult[]> {
+  if (!query || !query.trim()) return [];
+  try {
+    const params = new URLSearchParams({ q: query.trim() });
+    if (userLoc) {
+      params.append('lat', userLoc.latitude.toString());
+      params.append('lon', userLoc.longitude.toString());
+    }
+    const res = await fetch(`/api/geocoding?${params.toString()}`);
+    if (res.ok) {
+      const results: GeocodingResult[] = await res.json();
+      if (userLoc) {
+        return results.map(r => ({
+          ...r,
+          distanceMeters: haversine(userLoc, r.point)
+        })).sort((a, b) => (a.distanceMeters || 0) - (b.distanceMeters || 0));
+      }
+      return results;
+    }
+  } catch (_e) {}
+  return [];
+}
+
+export async function sendChatMessage(
+  content: string,
+  provider: AiProviderKey = 'gemini_flash',
+  apiKey?: string,
+  customEndpoint?: string
+): Promise<string> {
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content }] })
+      body: JSON.stringify({
+        messages: [{ role: 'user', content }],
+        provider,
+        apiKey,
+        customEndpoint
+      })
     });
     if (res.ok) {
       const data = await res.json();
@@ -479,4 +527,68 @@ export async function fetchNasaEarthAssets(lat: number, lon: number): Promise<an
   } catch (_e) {}
   return null;
 }
+
+// Live Connected Active Drivers on Map API
+import { ActiveDriver } from '../types';
+
+export async function fetchActiveDrivers(center: GeoPoint): Promise<ActiveDriver[]> {
+  try {
+    const res = await fetch(`/api/active-drivers?lat=${center.latitude}&lon=${center.longitude}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          role: d.role,
+          vehicleEmoji: d.vehicleEmoji || '🚗',
+          point: { latitude: d.lat, longitude: d.lon },
+          speedKmh: d.speedKmh || 40,
+          headingDeg: d.headingDeg || 0,
+          lastActiveMinutesAgo: d.lastActiveMinutesAgo || 1,
+          status: d.status || 'Online'
+        }));
+      }
+    }
+  } catch (_e) {}
+
+  // Fallback live drivers around user location (48 Active Phone Trackers Cluster)
+  const roles = [
+    { role: 'Motorcycle' as const, emoji: '🏍️' },
+    { role: 'Maxim Rider' as const, emoji: '🛵' },
+    { role: 'Foodpanda' as const, emoji: '🍔' },
+    { role: 'Grab' as const, emoji: '💚' },
+    { role: 'Taxi' as const, emoji: '🚕' },
+    { role: 'Driver' as const, emoji: '🚗' }
+  ];
+
+  const names = [
+    'Faiz_Rider', 'Abang_Maxim_04', 'Siti_Panda', 'Uncle_Sam_Taxi', 'Cap_Ahmad_EV', 'Driver_Gamer_99',
+    'Rider_Danial', 'Rizal_Delivery', 'Zul_Express', 'Bakar_Taxi', 'Hafiz_Nav', 'Kamal_Logistics',
+    'Rina_Rider', 'Aiman_Maxim', 'Yusof_Food', 'Farhan_Drive', 'Syafiq_Courier', 'Razak_Rider',
+    'Imran_Go', 'Nizam_Taxi', 'Ashraf_EV', 'Fikri_Panda', 'Syahmi_Grab', 'Helmi_Speed',
+    'Khairul_Rider', 'Asraf_Rider', 'Jamal_Taxi', 'Badrul_Express', 'Hariz_Courier', 'Kassim_Panda',
+    'Taufiq_Maxim', 'Anuar_Rider', 'Irwan_Drive', 'Mustafa_Taxi', 'Hamid_Rider', 'Ghani_Rider',
+    'Rahman_Grab', 'Johan_Express', 'Shukri_Courier', 'Latif_Maxim', 'Faizal_Panda', 'Amin_Taxi',
+    'Hadi_Rider', 'Zul_Nav', 'Zahar_Drive', 'Roslan_Express', 'Mamat_Taxi', 'Sharif_Rider'
+  ];
+
+  return names.map((name, idx) => {
+    const r = roles[idx % roles.length];
+    const dist = 80 + (idx * 22) % 1100;
+    const bearing = (idx * 37) % 360;
+    return {
+      id: `drv_${idx + 1}_${Date.now()}`,
+      name,
+      role: r.role,
+      vehicleEmoji: r.emoji,
+      point: offsetPoint(center, dist, bearing),
+      speedKmh: Math.floor(12 + (idx % 35)),
+      headingDeg: Math.floor(Math.random() * 360),
+      lastActiveMinutesAgo: 1,
+      status: idx % 3 === 0 ? 'Navigating' : idx % 5 === 0 ? 'Delivering' : 'Online'
+    };
+  });
+}
+
 

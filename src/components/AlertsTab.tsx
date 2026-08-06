@@ -17,6 +17,7 @@ export const AlertsTab: React.FC<AlertsTabProps> = ({
   settings
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
 
   const filteredAlerts = alerts.filter((alert) => {
     if (filterType === 'ALL') return true;
@@ -53,6 +54,34 @@ export const AlertsTab: React.FC<AlertsTabProps> = ({
           <span>{t('report_here', settings.language)}</span>
         </button>
       </div>
+
+      {/* Auto Phone Tracker Density Alert Banner */}
+      {!isBannerDismissed && (
+        <div className="bg-gradient-to-r from-red-950/80 via-slate-900 to-amber-950/80 border border-red-500/50 rounded-2xl p-3 text-xs text-slate-200 space-y-1 shadow-lg">
+          <div className="font-bold text-amber-300 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base">📱</span>
+              <span>Sistem Pengesanan Kepadatan Phone Tracker (Auto Alert)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-red-500/20 text-red-300 px-2 py-0.5 rounded text-[10px] font-mono border border-red-500/40">
+                Piawaian 40 - 50 Phone
+              </span>
+              <button
+                onClick={() => setIsBannerDismissed(true)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-0.5 rounded text-[10px] font-bold border border-slate-600 transition-all flex items-center gap-1"
+                title="Tutup / Skip Alert Ini"
+              >
+                <span>Skip</span>
+                <span>✕</span>
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-300 leading-relaxed">
+            Apabila kelompok phone tracker mencapai <strong>40 hingga standar 50 phone active</strong> dalam sesuatu lokasi, sistem MapAi mengesahkan keadaan sebagai <strong>Jalan Sesak / Kesesakan Teruk</strong> dan menyebarkan info alert serta-merta kepada semua pemandu.
+          </p>
+        </div>
+      )}
 
       {/* Type Filters */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">

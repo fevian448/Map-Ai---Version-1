@@ -11,7 +11,8 @@ import {
   Contributor,
   SettingsState,
   AlertTypeKey,
-  CategoryKey
+  CategoryKey,
+  SystemLog
 } from './types';
 import {
   fetchAlerts,
@@ -25,6 +26,7 @@ import {
   haversine
 } from './services/api';
 import { speakPrompt, playSpeedWarning } from './lib/audio';
+import { autoDownloadOfflineOnFirstInstall, getOfflineMapPackMeta } from './services/offlineMapStore';
 import { NavigationHeader } from './components/NavigationHeader';
 import { MapView } from './components/MapView';
 import { AlertsTab } from './components/AlertsTab';
@@ -36,14 +38,59 @@ import { SosTab } from './components/SosTab';
 import { ProfileTab } from './components/ProfileTab';
 import { SettingsTab } from './components/SettingsTab';
 import { ReportModal } from './components/ReportModal';
-import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as SettingsIcon, Smartphone } from 'lucide-react';
+import { TvInstallModal } from './components/TvInstallModal';
+import { AppBuilderStudioModal } from './components/AppBuilderStudioModal';
+import { FloatingAiCopilot } from './components/FloatingAiCopilot';
+import { GalleryVaultTab } from './components/GalleryVaultTab';
+import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as SettingsIcon, Smartphone, Tv, HardDrive, Camera } from 'lucide-react';
 import { t } from './lib/i18n';
+import { ActiveDriver } from './types';
+import { fetchActiveDrivers } from './services/api';
 
 // Default Location: Central Jakarta (-6.2088, 106.8456) or Default Metros
 const DEFAULT_LOCATION: GeoPoint = { latitude: -6.2088, longitude: 106.8456 };
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'map' | 'alerts' | 'drive' | 'tracker' | 'explore' | 'chat' | 'sos' | 'profile' | 'settings'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'alerts' | 'drive' | 'tracker' | 'gallery' | 'explore' | 'chat' | 'sos' | 'profile' | 'settings'>('map');
+  const [activeDrivers, setActiveDrivers] = useState<ActiveDriver[]>([]);
+
+  // System Logs & Telemetry
+  const [logs, setLogs] = useState<SystemLog[]>([
+    {
+      id: 'log_1',
+      timestamp: new Date().toLocaleTimeString(),
+      category: 'SYSTEM',
+      level: 'info',
+      message: 'MapAi system initialized with full permissions & Google AI Studio monitor'
+    },
+    {
+      id: 'log_2',
+      timestamp: new Date().toLocaleTimeString(),
+      category: 'PERMISSIONS',
+      level: 'success',
+      message: 'Frame permissions verified: Geolocation, Camera, Microphone'
+    }
+  ]);
+
+  const addLog = useCallback(
+    (
+      category: 'GPS' | 'AI' | 'PERMISSIONS' | 'SOCKET' | 'SYSTEM' | 'NAVIGATION',
+      level: 'info' | 'warn' | 'error' | 'success',
+      message: string
+    ) => {
+      setLogs((prev) => [
+        {
+          id: `log_${Date.now()}_${Math.random()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          category,
+          level,
+          message
+        },
+        ...prev.slice(0, 99)
+      ]);
+    },
+    []
+  );
 
   // State
   const [userLocation, setUserLocation] = useState<GeoPoint>(DEFAULT_LOCATION);
@@ -62,6 +109,8 @@ export function App() {
 
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
+  const [tvModalOpen, setTvModalOpen] = useState<boolean>(false);
+  const [appBuilderModalOpen, setAppBuilderModalOpen] = useState<boolean>(false);
 
   const [settings, setSettings] = useState<SettingsState>({
     serverUrl: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
@@ -69,42 +118,74 @@ export function App() {
     voiceGuidance: true,
     darkMode: true,
     speedUnit: 'kmh',
-    language: 'en'
+    language: 'en',
+    aiProvider: 'gemini_flash',
+    enableFloatingAi: true,
+    floatingAiMode: 'float',
+    floatingUiLayout: 'standard',
+    autoConfigMonitoring: true
   });
+
+  // Auto download compact offline map tiles on initial install / first launch
+  const [offlineMapNotice, setOfflineMapNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const meta = getOfflineMapPackMeta();
+    if (!meta) {
+      setOfflineMapNotice('📥 Memuat turun data peta offline secara automatik (~1.5MB tile cache)...');
+      autoDownloadOfflineOnFirstInstall(userLocation, (pct) => {
+        if (pct < 100) {
+          setOfflineMapNotice(`📥 Auto Download Peta Offline HP (${pct}%)...`);
+        } else {
+          setOfflineMapNotice('✅ Data Peta Offline Siap Di-cache ke Telefon!');
+          addLog('OFFLINE_MAP', 'success', 'Auto-downloaded compact offline map tiles on app install');
+          setTimeout(() => setOfflineMapNotice(null), 4000);
+        }
+      });
+    }
+  }, [userLocation, addLog]);
 
   // Get User Real Geolocation if available
   useEffect(() => {
     if ('geolocation' in navigator) {
+      addLog('PERMISSIONS', 'info', 'Requesting browser fine geolocation access...');
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
           setUserLocation(loc);
+          addLog('GPS', 'success', `GPS Location acquired: (${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)})`);
         },
-        (_err) => {
-          // Fall back to default location
+        (err) => {
+          addLog('GPS', 'warn', `GPS access warning: ${err.message || 'Using default location'}`);
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
-  }, []);
+  }, [addLog]);
 
-  // Fetch initial alerts, places, cameras, contributors
+  // Fetch initial alerts, places, cameras, contributors, and active drivers
   const loadData = useCallback(async () => {
-    const [fetchedAlerts, fetchedPlaces, fetchedContribs] = await Promise.all([
+    const [fetchedAlerts, fetchedPlaces, fetchedContribs, fetchedDrivers] = await Promise.all([
       fetchAlerts(userLocation),
       fetchPlaces(userLocation, selectedCategory.key),
-      fetchContributors()
+      fetchContributors(),
+      fetchActiveDrivers(userLocation)
     ]);
 
     setAlerts(fetchedAlerts);
     setPlaces(fetchedPlaces);
     setContributors(fetchedContribs);
+    setActiveDrivers(fetchedDrivers);
     setSpeedCameras(generateSpeedCameras(userLocation, 4));
   }, [userLocation, selectedCategory]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    const interval = setInterval(() => {
+      fetchActiveDrivers(userLocation).then((drvs) => setActiveDrivers(drvs));
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [loadData, userLocation]);
 
   // Handle Navigation / Drive simulation movement
   useEffect(() => {
@@ -196,6 +277,26 @@ export function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
+      {/* Auto Offline Map Download Notice Banner */}
+      {offlineMapNotice && (
+        <div className="bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-slate-950 font-black text-xs py-1.5 px-3 flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2">
+            <span>{offlineMapNotice}</span>
+            <span className="text-[10px] bg-slate-950 text-cyan-300 px-2 py-0.5 rounded font-mono hidden sm:inline-block">
+              COMPACT TILE CACHE
+            </span>
+          </div>
+          <button
+            onClick={() => setOfflineMapNotice(null)}
+            className="ml-2 bg-slate-950/80 hover:bg-slate-950 text-cyan-300 hover:text-white px-2 py-0.5 rounded text-[11px] font-bold border border-cyan-400/50 transition-all flex items-center gap-1 shrink-0"
+            title="Tutup / Skip Alert Ini"
+          >
+            <span>Skip / Close</span>
+            <span>✕</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Banner when Navigating */}
       {isNavigating && (
         <NavigationHeader
@@ -226,6 +327,7 @@ export function App() {
             onStartNavigation={handleStartNavigation}
             isNavigating={isNavigating}
             settings={settings}
+            activeDrivers={activeDrivers}
           />
         )}
 
@@ -264,6 +366,8 @@ export function App() {
           />
         )}
 
+        {activeTab === 'gallery' && <GalleryVaultTab userLocation={userLocation} settings={settings} />}
+
         {activeTab === 'explore' && (
           <ExploreTab
             places={places}
@@ -289,9 +393,31 @@ export function App() {
         {activeTab === 'profile' && <ProfileTab contributors={contributors} settings={settings} />}
 
         {activeTab === 'settings' && (
-          <SettingsTab settings={settings} onUpdateSettings={updateSettings} />
+          <SettingsTab
+            settings={settings}
+            onUpdateSettings={updateSettings}
+            onOpenInstallStudio={() => setTvModalOpen(true)}
+            onOpenAppBuilder={() => setAppBuilderModalOpen(true)}
+            logs={logs}
+            onClearLogs={() => setLogs([])}
+            userLocation={userLocation}
+            speedKmh={speedKmh}
+          />
         )}
       </main>
+
+      {/* Floating AI Copilot Widget (Active on Map & main views when enabled) */}
+      {settings.enableFloatingAi && activeTab !== 'chat' && (
+        <FloatingAiCopilot
+          settings={settings}
+          userLocation={userLocation}
+          places={places}
+          onSelectDestination={handleSelectDestination}
+          onStartNavigation={handleStartNavigation}
+          onAddLog={addLog}
+          onToggleDock={() => updateSettings({ enableFloatingAi: false, floatingAiMode: 'docked' })}
+        />
+      )}
 
       {/* Report Modal */}
       {reportModalOpen && (
@@ -302,6 +428,16 @@ export function App() {
           settings={settings}
         />
       )}
+
+      {/* Universal Installation & Smart TV Modal */}
+      <TvInstallModal isOpen={tvModalOpen} onClose={() => setTvModalOpen(false)} />
+
+      {/* Custom App Creator & SDK Studio Modal */}
+      <AppBuilderStudioModal
+        isOpen={appBuilderModalOpen}
+        onClose={() => setAppBuilderModalOpen(false)}
+        settings={settings}
+      />
 
       {/* Bottom Dock / Navigation Bar */}
       <nav id="bottom-navigation-dock" className="fixed bottom-0 left-0 right-0 z-[1500] bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
@@ -347,6 +483,16 @@ export function App() {
           <Smartphone className="w-5 h-5 text-cyan-400" />
           <span className="text-[10px]">{t('nav_tracker', settings.language)}</span>
           <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+        </button>
+
+        <button
+          onClick={() => setActiveTab('gallery')}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+            activeTab === 'gallery' ? 'text-cyan-400 scale-105 font-bold' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Camera className="w-5 h-5" />
+          <span className="text-[10px]">{t('nav_gallery', settings.language)}</span>
         </button>
 
         <button

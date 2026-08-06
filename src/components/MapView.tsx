@@ -9,11 +9,14 @@ import {
   PLACE_CATEGORIES,
   ALERT_TYPES,
   SpeedCamera,
-  SettingsState
+  SettingsState,
+  GeocodingResult,
+  ActiveDriver
 } from '../types';
-import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers } from 'lucide-react';
+import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship } from 'lucide-react';
 import { t } from '../lib/i18n';
-import { fetchNasaEonetEvents, NasaEonetEvent, haversine } from '../services/api';
+import { fetchNasaEonetEvents, NasaEonetEvent, haversine, searchGeocoding, fetchActiveDrivers } from '../services/api';
+import { fetchLiveAircraftRadar, fetchLiveSeaVesselsRadar, LiveAircraft, LiveVessel } from '../services/liveRadarStore';
 
 interface MapViewProps {
   userLocation: GeoPoint;
@@ -30,6 +33,7 @@ interface MapViewProps {
   onStartNavigation: () => void;
   isNavigating: boolean;
   settings: SettingsState;
+  activeDrivers?: ActiveDriver[];
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -46,21 +50,40 @@ export const MapView: React.FC<MapViewProps> = ({
   onOpenReportModal,
   onStartNavigation,
   isNavigating,
-  settings
+  settings,
+  activeDrivers = []
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
   const nasaLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const aircraftGroupRef = useRef<L.LayerGroup | null>(null);
+  const vesselGroupRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Place[]>([]);
+  const [searchResults, setSearchResults] = useState<{
+    id: string;
+    name: string;
+    subtitle?: string;
+    point: GeoPoint;
+    distanceMeters?: number;
+  }[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<any>(null);
   const [showNasaHazards, setShowNasaHazards] = useState(false);
+  const [showFlightRadar, setShowFlightRadar] = useState(true);
+  const [showMaritimeRadar, setShowMaritimeRadar] = useState(true);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [nasaEvents, setNasaEvents] = useState<NasaEonetEvent[]>([]);
+  const [liveAircraft, setLiveAircraft] = useState<LiveAircraft[]>([]);
+  const [liveVessels, setLiveVessels] = useState<LiveVessel[]>([]);
+
+  // Dismissable Alerts State
+  const [isTrackerBadgeDismissed, setIsTrackerBadgeDismissed] = useState(false);
+  const [dismissedJamAlertIds, setDismissedJamAlertIds] = useState<string[]>([]);
 
   // Initialize Map
   useEffect(() => {
@@ -75,6 +98,8 @@ export const MapView: React.FC<MapViewProps> = ({
 
       markersGroupRef.current = L.layerGroup().addTo(map);
       nasaLayerGroupRef.current = L.layerGroup().addTo(map);
+      aircraftGroupRef.current = L.layerGroup().addTo(map);
+      vesselGroupRef.current = L.layerGroup().addTo(map);
 
       // Handle map click to set custom destination
       map.on('click', (e: L.LeafletMouseEvent) => {
@@ -154,6 +179,114 @@ export const MapView: React.FC<MapViewProps> = ({
       });
     }
   }, [showNasaHazards, nasaEvents]);
+
+  // Live Aircraft & Sea Vessels Radar polling interval (Every 2 seconds)
+  useEffect(() => {
+    let interval: any;
+
+    const pollRadar = async () => {
+      if (showFlightRadar && userLocation) {
+        const flights = await fetchLiveAircraftRadar(userLocation);
+        setLiveAircraft(flights);
+      }
+      if (showMaritimeRadar && userLocation) {
+        const vessels = await fetchLiveSeaVesselsRadar(userLocation);
+        setLiveVessels(vessels);
+      }
+    };
+
+    pollRadar();
+    interval = setInterval(pollRadar, 2000);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [showFlightRadar, showMaritimeRadar, userLocation]);
+
+  // Render Live Aircraft on Map
+  useEffect(() => {
+    if (!aircraftGroupRef.current) return;
+    aircraftGroupRef.current.clearLayers();
+
+    if (showFlightRadar && liveAircraft.length > 0) {
+      liveAircraft.forEach((ac) => {
+        const icon = L.divIcon({
+          className: 'aircraft-marker',
+          html: `<div class="relative group cursor-pointer">
+                   <div class="bg-sky-950/90 border-2 border-sky-400 text-sky-200 text-xs px-2 py-1 rounded-xl shadow-2xl flex items-center gap-1 backdrop-blur-md hover:scale-110 transition-all" style="transform: rotate(${ac.headingDeg - 90}deg);">
+                     <span class="text-base">${ac.emoji}</span>
+                   </div>
+                   <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-sky-300 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-sky-500/40 whitespace-nowrap opacity-90 shadow-lg">
+                     ${ac.callsign} • ${ac.altitudeFt}ft
+                   </div>
+                 </div>`,
+          iconSize: [42, 32],
+          iconAnchor: [21, 16]
+        });
+
+        const m = L.marker([ac.point.latitude, ac.point.longitude], { icon }).bindPopup(
+          `<div class="p-2 font-sans text-slate-900 bg-white rounded-lg shadow-xl">
+             <div class="flex items-center justify-between border-b pb-1">
+               <span class="font-extrabold text-sky-700 text-sm">✈️ ${ac.callsign}</span>
+               <span class="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded font-mono font-bold">${ac.squawk}</span>
+             </div>
+             <div class="text-xs font-bold text-slate-800 mt-1.5">${ac.airline} • ${ac.aircraftType}</div>
+             <div class="text-xs text-slate-600 mt-1 grid grid-cols-2 gap-x-2 font-mono">
+               <div>Kelajuan: <strong>${ac.speedKmh} km/h</strong></div>
+               <div>Altitud: <strong>${ac.altitudeFt.toLocaleString()} ft</strong></div>
+               <div>Arah: <strong>${ac.headingDeg}°</strong></div>
+               <div>Mod: <strong class="text-emerald-600">LIVE RADAR</strong></div>
+             </div>
+             <div class="mt-2 text-[11px] bg-slate-100 p-1.5 rounded font-bold text-slate-700 border">
+               🗺️ Laluan: ${ac.origin} ➔ ${ac.destination}
+             </div>
+           </div>`
+        );
+        aircraftGroupRef.current?.addLayer(m);
+      });
+    }
+  }, [showFlightRadar, liveAircraft]);
+
+  // Render Live Sea Vessels on Map
+  useEffect(() => {
+    if (!vesselGroupRef.current) return;
+    vesselGroupRef.current.clearLayers();
+
+    if (showMaritimeRadar && liveVessels.length > 0) {
+      liveVessels.forEach((v) => {
+        const icon = L.divIcon({
+          className: 'vessel-marker',
+          html: `<div class="relative group cursor-pointer">
+                   <div class="bg-blue-950/90 border-2 border-cyan-400 text-cyan-200 text-xs px-2 py-1 rounded-xl shadow-2xl flex items-center gap-1 backdrop-blur-md hover:scale-110 transition-all">
+                     <span class="text-base">${v.emoji}</span>
+                   </div>
+                   <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-slate-900/90 text-cyan-300 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-cyan-500/40 whitespace-nowrap opacity-90 shadow-lg">
+                     ${v.flag} ${v.name}
+                   </div>
+                 </div>`,
+          iconSize: [40, 32],
+          iconAnchor: [20, 16]
+        });
+
+        const m = L.marker([v.point.latitude, v.point.longitude], { icon }).bindPopup(
+          `<div class="p-2 font-sans text-slate-900 bg-white rounded-lg shadow-xl">
+             <div class="flex items-center justify-between border-b pb-1">
+               <span class="font-extrabold text-blue-700 text-sm">${v.flag} ${v.name}</span>
+               <span class="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono font-bold">MMSI: ${v.mmsi}</span>
+             </div>
+             <div class="text-xs font-bold text-slate-800 mt-1.5">Kapal Laut: ${v.vesselType} (${v.lengthMeters}m)</div>
+             <div class="text-xs text-slate-600 mt-1 grid grid-cols-2 gap-x-2 font-mono">
+               <div>Kelajuan: <strong>${v.speedKnots} knots</strong></div>
+               <div>Arah: <strong>${v.headingDeg}°</strong></div>
+               <div>Status: <strong class="text-blue-600">EN ROUTE</strong></div>
+               <div>Pelabuhan: <strong>${v.destinationPort}</strong></div>
+             </div>
+           </div>`
+        );
+        vesselGroupRef.current?.addLayer(m);
+      });
+    }
+  }, [showMaritimeRadar, liveVessels]);
 
   // Update user location marker & pan
   useEffect(() => {
@@ -262,7 +395,37 @@ export const MapView: React.FC<MapViewProps> = ({
       markersGroupRef.current?.addLayer(m);
     });
 
-    // 4. Destination Marker
+    // 4. Live Active Online Drivers & Riders (Internet / Server Connected)
+    if (activeDrivers && activeDrivers.length > 0) {
+      activeDrivers.forEach((drv) => {
+        const icon = L.divIcon({
+          className: 'active-driver-marker',
+          html: `<div class="relative group cursor-pointer">
+                   <div class="absolute -inset-1 rounded-full bg-emerald-500/40 animate-ping"></div>
+                   <div class="relative bg-slate-900 border-2 border-emerald-400 text-white text-xs px-2 py-0.5 rounded-xl shadow-xl flex items-center gap-1 backdrop-blur-md">
+                     <span class="text-sm">${drv.vehicleEmoji}</span>
+                     <span class="text-[10px] font-extrabold text-emerald-300 truncate max-w-[70px]">${drv.name.split('_')[0]}</span>
+                   </div>
+                 </div>`,
+          iconSize: [85, 26],
+          iconAnchor: [42, 13]
+        });
+
+        const m = L.marker([drv.point.latitude, drv.point.longitude], { icon }).bindPopup(
+          `<div class="p-1 font-sans text-slate-900">
+             <div class="font-bold flex items-center gap-1 text-emerald-700 text-sm">
+               <span>${drv.vehicleEmoji}</span>
+               <span>${drv.name}</span>
+             </div>
+             <div class="text-xs font-semibold text-slate-700 mt-1">Role: ${drv.role} • Status: <span class="text-emerald-600 font-bold">${drv.status}</span></div>
+             <div class="text-[10px] text-slate-500 mt-0.5">Speed: ${drv.speedKmh} km/h • Active 1m ago</div>
+           </div>`
+        );
+        markersGroupRef.current?.addLayer(m);
+      });
+    }
+
+    // 5. Destination Marker
     if (destination) {
       const destIcon = L.divIcon({
         className: 'dest-marker',
@@ -277,7 +440,7 @@ export const MapView: React.FC<MapViewProps> = ({
         .bindPopup(`<b>${destinationName || 'Destination'}</b>`);
       markersGroupRef.current?.addLayer(m);
     }
-  }, [alerts, places, speedCameras, destination]);
+  }, [alerts, places, speedCameras, destination, activeDrivers]);
 
   // Render Route Polyline
   useEffect(() => {
@@ -307,17 +470,75 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [route, isNavigating]);
 
-  // Quick Search Filter
+  // Quick Search Filter & Global Geocoding
   const handleSearch = (q: string) => {
     setSearchQuery(q);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
     if (!q.trim()) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
-    const filtered = places.filter(
-      (p) => p.name.toLowerCase().includes(q.toLowerCase()) || p.category.includes(q.toLowerCase())
-    );
-    setSearchResults(filtered);
+
+    // 1. Instant local POI filter
+    const localFiltered = places
+      .filter((p) => p.name.toLowerCase().includes(q.toLowerCase()) || p.category.includes(q.toLowerCase()))
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        subtitle: `${p.category.toUpperCase()} • Nearby POI`,
+        point: p.point,
+        distanceMeters: p.distanceMeters
+      }));
+
+    setSearchResults(localFiltered);
+    setIsSearching(true);
+
+    // 2. Debounced API Geocoding Call for cities / global addresses
+    searchTimeoutRef.current = setTimeout(async () => {
+      const geoResults = await searchGeocoding(q, userLocation);
+      setIsSearching(false);
+
+      if (geoResults && geoResults.length > 0) {
+        const globalItems = geoResults.map((g) => ({
+          id: g.id,
+          name: g.name,
+          subtitle: g.address,
+          point: g.point,
+          distanceMeters: g.distanceMeters
+        }));
+
+        // Merge local and global items without duplicate IDs
+        const existingIds = new Set(localFiltered.map((item) => item.id));
+        const combined = [...localFiltered];
+
+        globalItems.forEach((item) => {
+          if (!existingIds.has(item.id)) {
+            combined.push(item);
+          }
+        });
+
+        setSearchResults(combined);
+      }
+    }, 350);
+  };
+
+  const handleSelectSearchResult = (item: {
+    id: string;
+    name: string;
+    point: GeoPoint;
+  }) => {
+    onSelectDestination(item.point, item.name);
+    setSearchQuery('');
+    setSearchResults([]);
+    if (mapRef.current) {
+      mapRef.current.flyTo([item.point.latitude, item.point.longitude], 14, {
+        duration: 1.5
+      });
+    }
   };
 
   const handleRecenter = () => {
@@ -331,7 +552,11 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* Top Floating Search & Quick Filters Bar */}
       <div id="map-top-bar" className="absolute top-3 left-3 right-3 z-[1000] flex flex-col gap-2 max-w-lg mx-auto">
         <div className="relative bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-xl p-1.5 flex items-center">
-          <Search className="w-5 h-5 text-slate-400 ml-3" />
+          {isSearching ? (
+            <Loader2 className="w-5 h-5 text-cyan-400 ml-3 animate-spin" />
+          ) : (
+            <Search className="w-5 h-5 text-slate-400 ml-3" />
+          )}
           <input
             type="text"
             value={searchQuery}
@@ -351,22 +576,27 @@ export const MapView: React.FC<MapViewProps> = ({
 
         {/* Search Results Dropdown */}
         {searchResults.length > 0 && (
-          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-2 shadow-2xl max-h-56 overflow-y-auto">
+          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-2 shadow-2xl max-h-64 overflow-y-auto space-y-1">
             {searchResults.map((place) => (
               <button
                 key={place.id}
-                onClick={() => {
-                  onSelectDestination(place.point, place.name);
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}
-                className="w-full p-2.5 rounded-xl hover:bg-slate-800 flex items-center justify-between text-left transition-colors"
+                onClick={() => handleSelectSearchResult(place)}
+                className="w-full p-2.5 rounded-xl hover:bg-slate-800/90 flex items-center justify-between text-left transition-colors border border-transparent hover:border-slate-700/60"
               >
-                <div>
-                  <div className="text-sm font-bold text-slate-100">{place.name}</div>
-                  <div className="text-xs text-slate-400">{(place.distanceMeters / 1000).toFixed(1)} km away</div>
+                <div className="min-w-0 pr-2">
+                  <div className="text-sm font-bold text-slate-100 truncate">{place.name}</div>
+                  {place.subtitle && (
+                    <div className="text-xs text-slate-400 truncate mt-0.5">{place.subtitle}</div>
+                  )}
+                  {place.distanceMeters !== undefined && (
+                    <div className="text-[11px] text-cyan-400 font-semibold mt-0.5">
+                      {(place.distanceMeters / 1000).toFixed(1)} km away
+                    </div>
+                  )}
                 </div>
-                <MapPin className="w-4 h-4 text-cyan-400" />
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4" />
+                </div>
               </button>
             ))}
           </div>
@@ -393,15 +623,40 @@ export const MapView: React.FC<MapViewProps> = ({
           })}
         </div>
 
-        {/* Live Traffic Jam Banner Alert */}
+        {/* Phone Tracker Cluster & Density Badge (Dismissable) */}
+        {activeDrivers && activeDrivers.length > 0 && !isTrackerBadgeDismissed && (
+          <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-900/90 border border-emerald-500/50 rounded-xl text-xs backdrop-blur-md shadow-lg">
+            <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>📱 {activeDrivers.length} Active Phone Trackers</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] font-mono text-slate-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
+                {activeDrivers.length >= 40 ? '🚦 Congestion Threshold (40-50): Jalan Sesak' : 'Standard 50 Radar'}
+              </div>
+              <button
+                onClick={() => setIsTrackerBadgeDismissed(true)}
+                className="text-slate-400 hover:text-white hover:bg-slate-800 p-1 rounded-lg transition-all text-xs font-black"
+                title="Tutup / Skip Info Badge Ini"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Live Traffic Jam Banner Alert (Dismissable & Skip/Close Button) */}
         {(() => {
           const nearestJam = alerts.find(
-            (a) => a.type === 'TRAFFIC' && userLocation && haversine(userLocation, a.point) < 4000
+            (a) => a.type === 'TRAFFIC' && userLocation && haversine(userLocation, a.point) < 4000 && !dismissedJamAlertIds.includes(a.id)
           );
           if (!nearestJam) return null;
           const distMeters = Math.round(haversine(userLocation, nearestJam.point));
           return (
-            <div id="traffic-jam-alert-banner" className="mt-2 bg-gradient-to-r from-red-950/95 via-slate-900/95 to-red-950/95 border-2 border-red-500/80 rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-in slide-in-from-top duration-200 text-slate-100 flex items-center justify-between gap-3">
+            <div id="traffic-jam-alert-banner" className="mt-2 bg-gradient-to-r from-red-950/95 via-slate-900/95 to-red-950/95 border-2 border-red-500/80 rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-in slide-in-from-top duration-200 text-slate-100 flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-red-600/30 border border-red-500/60 text-red-400 font-bold flex items-center justify-center text-xl shrink-0 animate-pulse">
                   🚦
@@ -418,12 +673,23 @@ export const MapView: React.FC<MapViewProps> = ({
                   </div>
                 </div>
               </div>
-              <button
-                onClick={onOpenReportModal}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl shrink-0 shadow-lg shadow-red-950/50 transition-all active:scale-95"
-              >
-                Report Update
-              </button>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={onOpenReportModal}
+                  className="px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold rounded-xl shadow-lg shadow-red-950/50 transition-all active:scale-95"
+                >
+                  Update
+                </button>
+                <button
+                  onClick={() => setDismissedJamAlertIds((prev) => [...prev, nearestJam.id])}
+                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold rounded-xl border border-slate-600 transition-all active:scale-95 flex items-center gap-1"
+                  title="Tutup / Skip Alert Ini"
+                >
+                  <span>Skip / Tutup</span>
+                  <span>✕</span>
+                </button>
+              </div>
             </div>
           );
         })()}
@@ -495,6 +761,42 @@ export const MapView: React.FC<MapViewProps> = ({
           title="Switch Map / NASA Satellite Layer"
         >
           <Layers className="w-6 h-6" />
+        </button>
+
+        {/* Live Flight Radar Toggle Button (Airplanes) */}
+        <button
+          onClick={() => setShowFlightRadar(!showFlightRadar)}
+          className={`relative w-12 h-12 rounded-2xl border flex items-center justify-center shadow-xl backdrop-blur-md transition-transform active:scale-95 ${
+            showFlightRadar
+              ? 'bg-sky-600 border-sky-400 text-white'
+              : 'bg-slate-900/90 border-slate-700/80 text-sky-400 hover:text-sky-300'
+          }`}
+          title="Toggle Live Airplanes / Flight Radar"
+        >
+          <Plane className="w-6 h-6" />
+          {showFlightRadar && liveAircraft.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-sky-400 text-slate-950 font-black text-[9px] px-1 rounded-full border border-slate-950 shadow">
+              {liveAircraft.length}
+            </span>
+          )}
+        </button>
+
+        {/* Live Maritime Sea Radar Toggle Button (Ships & Boats) */}
+        <button
+          onClick={() => setShowMaritimeRadar(!showMaritimeRadar)}
+          className={`relative w-12 h-12 rounded-2xl border flex items-center justify-center shadow-xl backdrop-blur-md transition-transform active:scale-95 ${
+            showMaritimeRadar
+              ? 'bg-blue-700 border-cyan-400 text-white'
+              : 'bg-slate-900/90 border-slate-700/80 text-cyan-400 hover:text-cyan-300'
+          }`}
+          title="Toggle Live Maritime Ships & Sea Radar"
+        >
+          <Ship className="w-6 h-6" />
+          {showMaritimeRadar && liveVessels.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-cyan-400 text-slate-950 font-black text-[9px] px-1 rounded-full border border-slate-950 shadow">
+              {liveVessels.length}
+            </span>
+          )}
         </button>
 
         <button
