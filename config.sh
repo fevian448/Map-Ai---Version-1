@@ -31,41 +31,32 @@ show_banner() {
 
 generate_admob_ids() {
     show_banner
-    info "Generating AdMob IDs..."
+    info "Setting up AdMob configuration (Empty for V-1, pending V-2)..."
     echo ""
     
-    # Generate placeholder AdMob IDs based on package name
-    # In production, replace with real IDs from AdMob console
-    ADMOB_APP_ID="ca-app-pub-3940256099942544~3347511713"  # Test ID
-    BANNER_AD_UNIT="ca-app-pub-3940256099942544/6300978111"  # Test ID
-    INTERSTITIAL_AD_UNIT="ca-app-pub-3940256099942544/1033173712"  # Test ID
-    REWARDED_AD_UNIT="ca-app-pub-3940256099942544/5224354917"  # Test ID
+    ADMOB_APP_ID=""
+    BANNER_AD_UNIT=""
+    INTERSTITIAL_AD_UNIT=""
+    REWARDED_AD_UNIT=""
     
-    info "AdMob Configuration:"
-    echo ""
-    echo "  AdMob App ID:"
-    echo "    $ADMOB_APP_ID"
-    echo ""
-    echo "  Ad Unit IDs:"
-    echo "    Banner:        $BANNER_AD_UNIT"
-    echo "    Interstitial:  $INTERSTITIAL_AD_UNIT"
-    echo "    Rewarded:      $REWARDED_AD_UNIT"
+    info "AdMob Configuration (Set to Empty for V-1):"
+    echo "  App ID: (Empty)"
+    echo "  Banner: (Empty)"
+    echo "  Interstitial: (Empty)"
+    echo "  Rewarded: (Empty)"
     echo ""
     
     # Save to config file
     cat > "$PROJECT/admob_config.properties" << EOF
-# AdMob Configuration
-# Replace test IDs with real IDs from https://admob.google.com
-ADMOB_APP_ID=$ADMOB_APP_ID
-BANNER_AD_UNIT=$BANNER_AD_UNIT
-INTERSTITIAL_AD_UNIT=$INTERSTITIAL_AD_UNIT
-REWARDED_AD_UNIT=$REWARDED_AD_UNIT
+# AdMob Configuration (V-1 Empty Placeholder)
+ADMOB_APP_ID=
+BANNER_AD_UNIT=
+INTERSTITIAL_AD_UNIT=
+REWARDED_AD_UNIT=
 EOF
     
-    ok "Saved to: $PROJECT/admob_config.properties"
+    ok "Saved empty configuration to: $PROJECT/admob_config.properties"
     echo ""
-    
-    warn "NOTE: These are TEST IDs. Replace with real IDs from AdMob console for production."
 }
 
 generate_keystore() {

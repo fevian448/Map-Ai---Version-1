@@ -61,16 +61,16 @@ export const AlertsTab: React.FC<AlertsTabProps> = ({
           <div className="font-bold text-amber-300 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-base">📱</span>
-              <span>Sistem Pengesanan Kepadatan Phone Tracker (Auto Alert)</span>
+              <span>Phone Tracker Density Detection System (Auto Alert)</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="bg-red-500/20 text-red-300 px-2 py-0.5 rounded text-[10px] font-mono border border-red-500/40">
-                Piawaian 40 - 50 Phone
+                Standard 40 - 50 Phones
               </span>
               <button
                 onClick={() => setIsBannerDismissed(true)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-0.5 rounded text-[10px] font-bold border border-slate-600 transition-all flex items-center gap-1"
-                title="Tutup / Skip Alert Ini"
+                title="Close / Skip This Alert"
               >
                 <span>Skip</span>
                 <span>✕</span>
@@ -78,7 +78,7 @@ export const AlertsTab: React.FC<AlertsTabProps> = ({
             </div>
           </div>
           <p className="text-[11px] text-slate-300 leading-relaxed">
-            Apabila kelompok phone tracker mencapai <strong>40 hingga standar 50 phone active</strong> dalam sesuatu lokasi, sistem MapAi mengesahkan keadaan sebagai <strong>Jalan Sesak / Kesesakan Teruk</strong> dan menyebarkan info alert serta-merta kepada semua pemandu.
+            When a cluster of phone trackers reaches <strong>40 to standard 50 active phones</strong> in a specific location, MapAi verifies heavy traffic congestion and broadcasts immediate alerts to all drivers.
           </p>
         </div>
       )}

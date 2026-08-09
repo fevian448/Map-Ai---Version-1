@@ -160,7 +160,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Bina aplikasi sendiri & kemaskini Keystore Google Play Console anda.
+                Build custom apps & update your Google Play Console signing keystore.
               </p>
             </div>
           </div>
@@ -218,8 +218,8 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>
               {activeSubTab === 'app_builder'
-                ? 'Pakej Aplikasi Peribadi berjaya dieksport!'
-                : 'Konfigurasi Keystore & gradle.properties berjaya dikemas kini!'}
+                ? 'Personal Application Package exported successfully!'
+                : 'Keystore & gradle.properties configuration updated successfully!'}
             </span>
           </div>
         )}
@@ -231,10 +231,10 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             <div className="bg-slate-950/90 border border-amber-500/40 rounded-2xl p-3.5 space-y-2 text-xs">
               <div className="flex items-center gap-2 text-amber-400 font-bold">
                 <DollarSign className="w-4 h-4 shrink-0" />
-                <span>Kunci API & Bayaran Peribadi (Personal API Key Notice)</span>
+                <span>Personal API Key & Billing Notice</span>
               </div>
               <p className="text-slate-300 leading-relaxed text-[11px]">
-                Untuk membina dan menggunakan aplikasi peribadi anda sendiri, sebarang bayaran kuota API (seperti Gemini API, Groq, atau Google Maps) perlu diuruskan sendiri melalui portal rasmi pembekal. MapAi tidak mengenakan sebarang caj tambahan.
+                To build and run your standalone app, API quota costs (such as Gemini, Groq, or Google Maps) are managed directly via the respective provider's console. MapAi charges zero additional fees.
               </p>
               <div className="flex items-center gap-2 pt-1">
                 <a
@@ -243,7 +243,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
                   rel="noreferrer"
                   className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-bold flex items-center gap-1 hover:bg-amber-500/30 transition-colors"
                 >
-                  <span>Dapatkan Google AI Studio Key</span>
+                  <span>Get Google AI Studio Key</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
                 <a
@@ -262,7 +262,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nama Aplikasi Anda / Application Name
+                  Application Name
                 </label>
                 <input
                   type="text"
@@ -275,7 +275,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Platform Sasaran / Target Platform
+                  Target Platform
                 </label>
                 <div className="grid grid-cols-4 gap-2 text-xs font-bold">
                   {[
@@ -305,7 +305,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Kunci API Peribadi Anda / Personal Gemini API Key
+                  Personal Gemini / AI API Key
                 </label>
                 <div className="relative">
                   <input
@@ -322,15 +322,15 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
               {/* Features Checkbox Grid */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Pilih Modul & Modul Ciri Aplikasi (Features)
+                  Select Application Modules & Features
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {[
-                    { id: 'live_map', label: 'Peta Live & OSRM Routing' },
-                    { id: 'speed_cam', label: 'Radar Kamera Kelajuan' },
+                    { id: 'live_map', label: 'Live Map & OSRM Routing' },
+                    { id: 'speed_cam', label: 'Speed Camera Radar' },
                     { id: 'ai_copilot', label: 'Floating AI Copilot' },
-                    { id: 'dashcam_gallery', label: 'Galeri Simpanan Dashcam' },
-                    { id: 'sos_radar', label: 'Mod Darurat & SOS' },
+                    { id: 'dashcam_gallery', label: 'Dashcam Vault' },
+                    { id: 'sos_radar', label: 'Emergency & SOS Mode' },
                     { id: 'socket_live', label: 'Live Rider Socket Push' }
                   ].map((f) => (
                     <label
@@ -366,13 +366,13 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
                 <span>Google Play App Signing Keystore Manager</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Masukkan maklumat Keystore Android milik anda untuk proses penandatanganan aplikasi (Signing Release AAB/APK) sebelum dimuat naik ke Google Play Console.
+                Enter your Android Keystore information for app signing (Release AAB/APK) before uploading to Google Play Console.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Nama Keystore File (.keystore / .jks)</label>
+                <label className="block text-slate-300 font-bold mb-1">Keystore File Name (.keystore / .jks)</label>
                 <input
                   type="text"
                   value={keystoreFileName}
@@ -383,7 +383,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Key Alias / Nama Alias</label>
+                <label className="block text-slate-300 font-bold mb-1">Key Alias</label>
                 <input
                   type="text"
                   value={keystoreAlias}
@@ -394,7 +394,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Store Password (Kata Laluan Store)</label>
+                <label className="block text-slate-300 font-bold mb-1">Store Password</label>
                 <input
                   type="password"
                   value={storePassword}
@@ -405,7 +405,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Key Password (Kata Laluan Key)</label>
+                <label className="block text-slate-300 font-bold mb-1">Key Password</label>
                 <input
                   type="password"
                   value={keyPassword}
@@ -427,7 +427,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Organization / Syarikat (O)</label>
+                <label className="block text-slate-300 font-bold mb-1">Organization (O)</label>
                 <input
                   type="text"
                   value={organization}
@@ -441,12 +441,12 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             {/* Optional Base64 Keystore Import */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                Tampal Keystore Base64 / Encoded Key (Pilihan)
+                Paste Keystore Base64 / Encoded Key (Optional)
               </label>
               <textarea
                 value={keystoreBase64}
                 onChange={(e) => setKeystoreBase64(e.target.value)}
-                placeholder="Tampal rentetan Base64 file .keystore jika ada..."
+                placeholder="Paste Base64 string of your .keystore file if available..."
                 rows={2}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-[11px] font-mono text-slate-300 focus:outline-none focus:border-amber-500"
               />
@@ -455,7 +455,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             {/* CLI Command Generator */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-400 text-[11px]">Arahan CLI Keytool untuk Bina Keystore Baru:</span>
+                <span className="font-bold text-slate-400 text-[11px]">Keytool CLI Command to Create New Keystore:</span>
               </div>
               <code className="block text-[10px] font-mono text-amber-300 bg-slate-900 p-2 rounded-xl break-all">
                 {generateKeytoolCommand()}
@@ -470,10 +470,10 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             <div className="bg-emerald-950/40 border border-emerald-500/50 rounded-2xl p-3 text-xs text-emerald-200 space-y-1">
               <div className="font-bold flex items-center gap-1.5 text-emerald-300">
                 <DollarSign className="w-4 h-4" />
-                <span>Pengurusan Iklan AdMob & Tetapan Developer Android</span>
+                <span>AdMob Advertising & Android Developer Settings</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Konfigurasikan ID Aplikasi AdMob dan ID Unit Iklan (Banner, Interstitial, Rewarded) serta nama pakej Android untuk aplikasi terbitan anda.
+                Configure your AdMob App ID and Ad Unit IDs (Banner, Interstitial, Rewarded) and Android package name for your app release.
               </p>
               <button
                 onClick={() => {
@@ -484,7 +484,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
                 }}
                 className="mt-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold hover:bg-emerald-500/30 transition-all"
               >
-                Guna ID Test Rasmi Google AdMob
+                Use Official Google AdMob Test IDs
               </button>
             </div>
 
@@ -596,7 +596,7 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
           >
-            Tutup
+            Close
           </button>
           <button
             onClick={handleDownloadAppPackage}
@@ -605,10 +605,10 @@ ADMOB_REWARDED_ID=${admobRewardedId}`;
             <Download className="w-4 h-4" />
             <span>
               {activeSubTab === 'app_builder'
-                ? 'Eksport Pakej Aplikasi'
+                ? 'Export App Package'
                 : activeSubTab === 'keystore_play'
-                ? 'Simpan gradle.properties'
-                : 'Simpan admob_config.properties'}
+                ? 'Save gradle.properties'
+                : 'Save admob_config.properties'}
             </span>
           </button>
         </div>

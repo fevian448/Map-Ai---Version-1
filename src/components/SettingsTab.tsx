@@ -145,7 +145,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
             >
               <Code2 className="w-4 h-4" />
-              <span>Pakej Studio & TV 🚀</span>
+              <span>Studio Package & TV 🚀</span>
             </button>
           )}
 
@@ -155,7 +155,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Bina Aplikasi Sendiri / SDK Builder 🛠️</span>
+              <span>Custom App / SDK Builder 🛠️</span>
             </button>
           )}
         </div>
@@ -685,13 +685,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <span>Pengurusan Data Peta Offline (Data Kecil ~1.5MB)</span>
+                <span>Offline Map Data Management (~1.5MB)</span>
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                   AUTO DOWNLOAD
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400">
-                Data peta bersaiz kecil untuk kegunaan tanpa internet & auto-cache bila aplikasi dipasang
+                Compact map data for offline navigation & auto-caching upon installation
               </p>
             </div>
           </div>
@@ -704,27 +704,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center justify-between font-bold">
                 <span className="text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Peta Offline Aktif ({offlinePack.regionName})</span>
+                  <span>Offline Map Active ({offlinePack.regionName})</span>
                 </span>
                 <button
                   onClick={handleClearOffline}
                   className="text-slate-400 hover:text-rose-400 text-[10px] font-bold flex items-center gap-1"
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>Padam Data</span>
+                  <span>Delete Data</span>
                 </button>
               </div>
               <div className="text-[11px] text-slate-300 grid grid-cols-2 gap-2 font-mono bg-slate-900/80 p-2 rounded-lg border border-slate-800">
-                <div>Jum Tile: <strong className="text-cyan-300">{offlinePack.tileCount} tiles</strong></div>
-                <div>Saiz Data: <strong className="text-emerald-300">{offlinePack.sizeMb} MB</strong></div>
+                <div>Total Tiles: <strong className="text-cyan-300">{offlinePack.tileCount} tiles</strong></div>
+                <div>Data Size: <strong className="text-emerald-300">{offlinePack.sizeMb} MB</strong></div>
                 <div className="col-span-2 text-[10px] text-slate-400">
-                  Dikemaskini: {new Date(offlinePack.downloadedAt).toLocaleString()}
+                  Updated: {new Date(offlinePack.downloadedAt).toLocaleString()}
                 </div>
               </div>
             </div>
           ) : (
             <div className="text-slate-400 text-[11px]">
-              Belum ada data peta offline. Sila muat turun di bawah untuk simpanan data tempatan bersaiz kecil.
+              No offline map data saved yet. Click below to download compact local map tiles.
             </div>
           )}
 
@@ -732,7 +732,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {isDownloadingOffline && (
             <div className="space-y-1 pt-1">
               <div className="flex justify-between text-[10px] font-bold text-cyan-300">
-                <span>Memuat turun tile peta...</span>
+                <span>Downloading map tiles...</span>
                 <span>{downloadProgress}%</span>
               </div>
               <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -758,7 +758,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>Muat Turun Data Peta Offline (Auto Compact ~1.5MB)</span>
+                  <span>Download Offline Map Data (Auto Compact ~1.5MB)</span>
                 </>
               )}
             </button>
@@ -774,13 +774,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-              <span>Server Percuma & Live Runtime Continuous Sync</span>
+              <span>Free Backend Servers & Live Runtime Continuous Sync</span>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 ALWAYS ONLINE
               </span>
             </h3>
             <p className="text-[11px] text-slate-400">
-              Pertukaran automatik ke server percuma (Render/Railway/Local) untuk memastikan live runtime sentiasa berfungsi tanpa terputus.
+              Automatic fallback to free backend instances (Render/Railway/Local) ensuring live runtime continuity.
             </p>
           </div>
         </div>

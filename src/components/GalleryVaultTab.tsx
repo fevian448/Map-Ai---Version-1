@@ -110,7 +110,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
         fileSizeMb: '0.8 MB'
       };
       setItems((prev) => [newItem, ...prev]);
-      showToast('Gambar baru berjaya disimpan ke Galeri Simpanan!');
+      showToast('New snapshot saved to Media Vault!');
       stopCamera();
     }
   };
@@ -138,7 +138,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
           fileSizeMb: '3.2 MB'
         };
         setItems((prev) => [newItem, ...prev]);
-        showToast('Klip video Dashcam berjaya disimpan!');
+        showToast('Dashcam video clip saved successfully!');
         stopCamera();
       };
       recorder.start();
@@ -177,7 +177,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
         fileSizeMb: `${(file.size / (1024 * 1024)).toFixed(1)} MB`
       };
       setItems((prev) => [newItem, ...prev]);
-      showToast('Fail media berjaya dimuat naik ke Galeri!');
+      showToast('Media file uploaded to Gallery!');
     };
     reader.readAsDataURL(file);
   };
@@ -185,7 +185,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
   const deleteItem = (id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
     if (selectedItem?.id === id) setSelectedItem(null);
-    showToast('Media dipadamkan dari galeri.');
+    showToast('Media deleted from vault.');
   };
 
   const showToast = (msg: string) => {
@@ -240,7 +240,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
 
           <label className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all">
             <Upload className="w-4 h-4 text-cyan-400" />
-            <span>Muat Naik Media</span>
+            <span>Upload Media</span>
             <input type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
@@ -267,9 +267,9 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
       {filteredItems.length === 0 ? (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center text-slate-400 space-y-2">
           <Image className="w-8 h-8 text-slate-600 mx-auto" />
-          <div className="text-sm font-bold text-slate-300">Tiada media dalam kategori ini</div>
+          <div className="text-sm font-bold text-slate-300">No media in this category</div>
           <p className="text-xs text-slate-500">
-            Tekan &quot;Rakam / Tangkap Foto&quot; untuk menambah gambar atau video baru.
+            Press &quot;Capture Photo / Record&quot; to add new photos or videos.
           </p>
         </div>
       ) : (
@@ -329,7 +329,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
 
             <div className="flex items-center gap-2">
               <Camera className="w-5 h-5 text-cyan-400" />
-              <h3 className="text-sm font-bold text-white">Rakam Dashcam / Tangkap Bukti</h3>
+              <h3 className="text-sm font-bold text-white">Record Dashcam / Capture Proof</h3>
             </div>
 
             <div className="aspect-video bg-black rounded-2xl overflow-hidden relative flex items-center justify-center border border-slate-800">
@@ -348,7 +348,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
                 className="py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold rounded-xl text-xs flex items-center justify-center gap-2"
               >
                 <Camera className="w-4 h-4 text-cyan-400" />
-                <span>Tangkap Gambar</span>
+                <span>Capture Photo</span>
               </button>
 
               {!isRecording ? (
@@ -357,7 +357,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
                   className="py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/30"
                 >
                   <Video className="w-4 h-4" />
-                  <span>Mula Rakam Video</span>
+                  <span>Start Video Recording</span>
                 </button>
               ) : (
                 <button
@@ -365,7 +365,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
                   className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2"
                 >
                   <X className="w-4 h-4" />
-                  <span>Henti & Simpan</span>
+                  <span>Stop & Save</span>
                 </button>
               )}
             </div>
@@ -396,15 +396,15 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
 
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Lokasi:</span>
+                <span className="text-slate-400">Location:</span>
                 <span className="font-semibold text-cyan-300">{selectedItem.locationName}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Masa:</span>
+                <span className="text-slate-400">Time:</span>
                 <span className="font-semibold text-slate-200">{selectedItem.timestamp}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Kategori:</span>
+                <span className="text-slate-400">Category:</span>
                 <span className="font-semibold text-amber-400">{selectedItem.category}</span>
               </div>
             </div>
@@ -415,7 +415,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
                 className="px-3 py-2 rounded-xl bg-red-950/80 border border-red-800/80 text-red-300 hover:bg-red-900 text-xs font-bold flex items-center gap-1.5"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Padam</span>
+                <span>Delete</span>
               </button>
 
               <a
@@ -424,7 +424,7 @@ export const GalleryVaultTab: React.FC<GalleryVaultTabProps> = ({ userLocation, 
                 className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md"
               >
                 <Download className="w-4 h-4" />
-                <span>Muat Turun Fail</span>
+                <span>Download File</span>
               </a>
             </div>
           </div>
