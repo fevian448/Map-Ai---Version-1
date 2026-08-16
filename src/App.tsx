@@ -45,6 +45,7 @@ import { GalleryVaultTab } from './components/GalleryVaultTab';
 import { GoogleWorkspaceHub } from './components/GoogleWorkspaceHub';
 import { GitLabHub } from './components/GitLabHub';
 import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as SettingsIcon, Smartphone, Tv, HardDrive, Camera, Sparkles, Gitlab } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { t } from './lib/i18n';
 import { ActiveDriver } from './types';
 import { fetchActiveDrivers } from './services/api';
@@ -586,6 +587,9 @@ export function App() {
           <span className="text-[10px]">{t('nav_settings', settings.language)}</span>
         </button>
       </nav>
+      
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }

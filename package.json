@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "*",
+    "@vercel/speed-insights": "^2.0.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "firebase": "^12.17.1",
