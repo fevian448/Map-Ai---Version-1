@@ -48,6 +48,7 @@ import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as Setting
 import { t } from './lib/i18n';
 import { ActiveDriver } from './types';
 import { fetchActiveDrivers } from './services/api';
+import { Analytics } from '@vercel/analytics/react';
 
 // Default Location: Central Jakarta (-6.2088, 106.8456) or Default Metros
 const DEFAULT_LOCATION: GeoPoint = { latitude: -6.2088, longitude: 106.8456 };
@@ -586,6 +587,9 @@ export function App() {
           <span className="text-[10px]">{t('nav_settings', settings.language)}</span>
         </button>
       </nav>
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
