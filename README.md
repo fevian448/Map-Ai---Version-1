@@ -18,9 +18,11 @@ It is designed to run seamlessly across all operating systems: **Android, iOS, W
 | **Live Express Delivery Hubs** | Real-time rider hubs & status indicators for **Maxim, GrabFood, GrabExpress, and Foodpanda (pandamart)** |
 | **NASA Live Telemetry & Feed** | Real-time ISS station satellite tracking (speed & altitude) plus NASA Live video feed and EONET wildfire/storm alerts |
 | **Live Multi-Device Phone Tracker** | Real-time tracking of family members, fleet drivers, and express riders |
-| **Crowdsourced Traffic Alerts** | Real-time hazard reporting — police traps, traffic jams, accidents, roadworks, speed cameras — with confidence scoring |
+| **Crowdsourced Traffic Alerts** | Real-time hazard reporting — police traps, traffic jams, accidents, roadworks, speed cameras — with density confidence scoring |
 | **Smart Speedometer & Drive Tab** | Real-time GPS speedometer, speed limit warnings, road weather conditions, and speed camera alerts |
+| **Media & Dashcam Vault** | Local in-app camera capture and dashcam video recording with geotagging and export |
 | **Emergency SOS System** | Instant siren trigger, fake incoming call simulator, SMS/Call emergency contacts, and live location broadcasting |
+| **Vercel Cron & Cloud Automation** | Scheduled daily maintenance endpoint (`/api/cron`, `vercel.json`) with `CRON_SECRET` authorization for SOS and report cache cleanup |
 | **Studio Installation & Multi-Stack** | Clean Installation & Studio Build panel in Settings supporting **Gradle (Android), React (PWA), Rust (Tauri), Windows (.exe), and Smart TV** |
 
 ---
@@ -79,24 +81,31 @@ MapAi/
 │   │   ├── DriveTab.tsx          # Speedometer, weather & camera warnings
 │   │   ├── ExploreTab.tsx        # POIs & Maxim/Grab/Foodpanda hubs
 │   │   ├── PhoneTrackerTab.tsx   # Multi-device GPS tracking
+│   │   ├── GalleryVaultTab.tsx   # Media & Dashcam vault recording
 │   │   ├── NasaWidget.tsx        # NASA TV Live & ISS telemetry tracking
 │   │   ├── AlertsTab.tsx         # Traffic hazards & crowd alerts
 │   │   ├── SettingsTab.tsx       # Studio Build & App Install launcher
+│   │   ├── AppBuilderStudioModal.tsx # Personal App & Keystore generator
 │   │   ├── TvInstallModal.tsx    # Multi-stack & TV installation guide
+│   │   ├── GitLabHub.tsx         # GitLab repository & CI/CD status hub
 │   │   └── SosTab.tsx            # Emergency SOS & siren simulator
 │   ├── services/                 # API client & backend proxy handlers
 │   ├── lib/                      # i18n & utilities
 │   └── types.ts                  # Shared TypeScript interfaces
 ├── app/                          # Native Android app module (Gradle)
+│   ├── api/cron/route.ts         # Vercel / Next.js Serverless Cron Route
 │   └── src/main/java/com/example/mapai/
 │       ├── data/                 # Models, repository & Retrofit client
 │       ├── location/             # Location tracking service
 │       └── ui/                   # Jetpack Compose screens
 ├── backend/                      # Express + SQLite + Socket.IO server
-│   ├── server.js                 # API routes & Gemini/NASA proxy
+│   ├── server.js                 # API routes, Cron endpoint & Gemini/NASA proxy
 │   └── public/                   # Live map web viewer
+├── vercel.json                   # Vercel Cron configuration schedule
+├── admob_config.properties       # AdMob App ID & Unit configuration (V-1 Empty)
+├── keystore_config.properties    # Android Release signing identity credentials
 ├── public/                       # PWA manifest, favicon & icons
-├── server.ts                     # Dev server entry point
+├── server.ts                     # Dev server entry point & /api/cron handler
 ├── workflow.sh                   # Main automation script
 └── README.md                     # Documentation
 ```
@@ -156,9 +165,38 @@ GEMINI_API_KEY=your_gemini_api_key_here
 # Optional NASA API key (defaults to NASA DEMO_KEY)
 NASA_API_KEY=your_nasa_api_key_here
 
+# Secret authorization key for Vercel Cron Jobs & Cloud Scheduler
+CRON_SECRET=your_secret_cron_token_here
+
 # Backend port configuration
 PORT=3000
 ```
+
+---
+
+## Vercel Cron Jobs Configuration
+
+MapAi supports scheduled serverless cron jobs for automated system maintenance (pruning expired SOS logs and stale hazard reports):
+
+1. **Cron Schedule (`vercel.json`)**:
+   ```json
+   {
+     "crons": [
+       {
+         "path": "/api/cron",
+         "schedule": "0 10 * * *"
+       }
+     ]
+   }
+   ```
+
+2. **Route Handlers**:
+   - Next.js App Router: `app/api/cron/route.ts` & `app/api/cron/route.js`
+   - Express Dev Server: `server.ts` (`/api/cron`)
+   - Backend Production Server: `backend/server.js` (`/api/cron`)
+
+3. **Security Authorization**:
+   - Vercel automatically passes the `Authorization: Bearer <CRON_SECRET>` header. Requests with invalid or missing secrets return `401 Unauthorized`.
 
 ---
 
