@@ -128,6 +128,43 @@ async function startServer() {
     res.json({ name: "MapAi Backend", status: "ok", time: Date.now() });
   });
 
+  // Vercel & Cloud Cron Jobs API
+  app.get("/api/cron", (req, res) => {
+    const authHeader = req.headers["authorization"] || req.headers.authorization;
+    const cronSecret = process.env.CRON_SECRET;
+
+    // Check CRON_SECRET if configured in environment
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Invalid or missing CRON_SECRET authorization header"
+      });
+    }
+
+    // Perform scheduled maintenance tasks
+    const now = Date.now();
+    const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+
+    // Prune expired SOS alerts older than 24 hours
+    const initialSosCount = sosList.length;
+    for (let i = sosList.length - 1; i >= 0; i--) {
+      if (sosList[i].created_at < twentyFourHoursAgo) {
+        sosList.splice(i, 1);
+      }
+    }
+    const prunedSosCount = initialSosCount - sosList.length;
+
+    res.json({
+      ok: true,
+      status: "success",
+      message: "MapAi Cron Job executed successfully",
+      timestamp: new Date().toISOString(),
+      prunedSosCount,
+      activeReports: reports.length,
+      activeContributors: contributors.length
+    });
+  });
+
   // Reports API
   app.get("/api/reports", (req, res) => {
     const { lat, lon, radius = 10 } = req.query;

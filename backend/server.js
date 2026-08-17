@@ -199,6 +199,40 @@ const upload = multer({
 // ---- helpers ----
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
+// ---- Cron Jobs (Vercel / Cloud Scheduler) ----
+app.get("/api/cron", (req, res) => {
+  const authHeader = req.headers["authorization"] || req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({
+      error: "Unauthorized",
+      message: "Invalid or missing CRON_SECRET authorization header"
+    });
+  }
+
+  try {
+    const now = Date.now();
+    const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+    
+    // Cleanup old SOS alerts older than 24 hours
+    const sosResult = db.prepare("DELETE FROM sos WHERE created_at < ?").run(twentyFourHoursAgo);
+    
+    logger.info(`Cron executed: cleaned up ${sosResult.changes} old SOS records`);
+
+    res.json({
+      ok: true,
+      status: "success",
+      message: "MapAi Cron Job executed successfully",
+      timestamp: new Date().toISOString(),
+      prunedSosCount: sosResult.changes
+    });
+  } catch (err) {
+    logger.error("Cron execution error:", err.message);
+    res.status(500).json({ error: "Failed to execute cron job" });
+  }
+});
+
 // ---- Reports (crowd-sourced traffic / hazards) ----
 app.get("/api/reports", (req, res) => {
   const { lat, lon, radius = 5 } = req.query;
