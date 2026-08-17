@@ -24,6 +24,7 @@ import {
   getDirectionsRoute,
   generateSpeedCameras,
   getWeatherInfo,
+  fetchLiveWeather,
   haversine,
   fetchTierStatus
 } from './services/api';
@@ -247,19 +248,21 @@ export function App() {
     };
   }, [addLog]);
 
-  // Fetch initial alerts, places, cameras, contributors, and active drivers
+  // Fetch initial alerts, places, cameras, contributors, active drivers and live weather
   const loadData = useCallback(async () => {
-    const [fetchedAlerts, fetchedPlaces, fetchedContribs, fetchedDrivers] = await Promise.all([
+    const [fetchedAlerts, fetchedPlaces, fetchedContribs, fetchedDrivers, liveWeather] = await Promise.all([
       fetchAlerts(userLocation),
       fetchPlaces(userLocation, selectedCategory.key),
       fetchContributors(),
-      fetchActiveDrivers(userLocation)
+      fetchActiveDrivers(userLocation),
+      fetchLiveWeather(userLocation)
     ]);
 
     setAlerts(fetchedAlerts);
     setPlaces(fetchedPlaces);
     setContributors(fetchedContribs);
     setActiveDrivers(fetchedDrivers);
+    if (liveWeather) setWeather(liveWeather);
     setSpeedCameras(generateSpeedCameras(userLocation, 4));
   }, [userLocation, selectedCategory]);
 
@@ -289,9 +292,16 @@ export function App() {
           playSpeedWarning();
         }
 
-        // Voice prompt at start
+        // Voice prompt on start or milestone turns
         if (stepIdx === 1 && settings.voiceGuidance) {
-          speakPrompt(`Navigating to ${destinationName}. Drive safely.`, settings.language);
+          const firstStep = route.steps?.[0]?.instruction || `Menuju ke ${destinationName}. Pandu dengan cermat.`;
+          speakPrompt(`Navigasi aktif. ${firstStep}`, settings.language);
+        } else if (stepIdx > 1 && stepIdx % 5 === 0 && settings.voiceGuidance && route.steps) {
+          const turnIdx = Math.floor(stepIdx / 5) % route.steps.length;
+          const currentInstruction = route.steps[turnIdx]?.instruction;
+          if (currentInstruction) {
+            speakPrompt(currentInstruction, settings.language);
+          }
         }
       }, 3000);
     } else {

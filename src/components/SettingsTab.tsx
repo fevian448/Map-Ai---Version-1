@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SettingsState, LanguageCode, AiProviderKey, SystemLog, GeoPoint } from '../types';
-import { Settings, Globe, Map, Volume2, Gauge, Server, Download, Cpu, Smartphone, Laptop, Tv, Code2, Sparkles, Key, Link, ShieldCheck, Lock, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Pin, Move, Camera, Mic, MapPin, Bell, Trash2, Wifi } from 'lucide-react';
+import { SettingsState, LanguageCode, AiProviderKey, SystemLog, GeoPoint, BottomDockItemKey, BottomDockVisibility } from '../types';
+import { Settings, Globe, Map, Volume2, Gauge, Server, Download, Cpu, Smartphone, Laptop, Tv, Code2, Sparkles, Key, Link, ShieldCheck, Lock, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Pin, Move, Camera, Mic, MapPin, Bell, Trash2, Wifi, SlidersHorizontal, Eye, EyeOff, LayoutGrid, Bot, Compass, Radio, User, Gitlab, RotateCcw } from 'lucide-react';
 import { t } from '../lib/i18n';
 import { sendChatMessage } from '../services/api';
 import { DiagnosticLogger } from './DiagnosticLogger';

@@ -124,24 +124,102 @@ export interface RouteSegment {
   roadName: string;
 }
 
+export interface NavigationStep {
+  id: string;
+  instruction: string;
+  maneuverType: 'turn-right' | 'turn-left' | 'straight' | 'u-turn' | 'fork' | 'roundabout' | 'depart' | 'arrive';
+  modifier?: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  roadName: string;
+  point: GeoPoint;
+}
+
 export interface RouteInfo {
   points: GeoPoint[];
   segments: RouteSegment[];
+  steps?: NavigationStep[];
   totalDistanceMeters: number;
   durationSeconds: number;
   freeFlowDurationSeconds: number;
   hasTolls: boolean;
   overallTraffic: TrafficLevel;
+  summary?: string;
+  alternatives?: RouteInfo[];
 }
 
 export interface WeatherInfo {
   condition: string;
   emoji: string;
   temperatureC: number;
+  feelsLikeC?: number;
   windKph: number;
   humidity: number;
   visibilityKm: number;
   roadRisk: string;
+  precipitationMm?: number;
+  source?: string;
+}
+
+export interface WaterGaugeStation {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  stageMeters: number;
+  flowCms: number;
+  status: 'NORMAL' | 'ELEVATED' | 'FLOOD_WARNING';
+  lastUpdated: string;
+}
+
+export interface WaterDataInfo {
+  status: string;
+  floodRisk: string;
+  rateLimit: number;
+  rateRemaining: number;
+  stationsCount: number;
+  stations: WaterGaugeStation[];
+  source: string;
+}
+
+export interface EarthquakeFeedItem {
+  id: string;
+  title: string;
+  place: string;
+  magnitude: number;
+  magType: string;
+  time: number;
+  updated: number;
+  latitude: number;
+  longitude: number;
+  depthKm: number;
+  tsunami: boolean;
+  alertLevel: 'green' | 'yellow' | 'orange' | 'red';
+  severityLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  felt?: number | null;
+  cdi?: number | null;
+  mmi?: number | null;
+  sig?: number;
+  status: string;
+  url: string;
+  distanceKm?: number | null;
+  feedSource: string;
+}
+
+export interface EarthquakeFeedResponse {
+  status: string;
+  feedName: string;
+  count: number;
+  generated: number;
+  apiStatus: number;
+  formats: {
+    geojson: string;
+    atom: string;
+    kml: string;
+    csv: string;
+    quakeml: string;
+  };
+  items: EarthquakeFeedItem[];
 }
 
 export interface SpeedCamera {
@@ -223,6 +301,22 @@ export interface RecentDestination {
   address?: string;
 }
 
+export type BottomDockItemKey =
+  | 'map'
+  | 'alerts'
+  | 'drive'
+  | 'tracker'
+  | 'gallery'
+  | 'explore'
+  | 'chat'
+  | 'sos'
+  | 'workspace'
+  | 'gitlab'
+  | 'profile'
+  | 'settings';
+
+export type BottomDockVisibility = Record<BottomDockItemKey, boolean>;
+
 export interface SettingsState {
   serverUrl: string;
   mapProvider: 'osm' | 'google' | 'nasa_gibs' | 'nasa_night';
@@ -240,4 +334,5 @@ export interface SettingsState {
   floatingAiMode: 'float' | 'docked';
   floatingUiLayout: 'standard' | 'minimal' | 'expanded';
   autoConfigMonitoring: boolean;
+  bottomDockVisibility?: Partial<BottomDockVisibility>;
 }

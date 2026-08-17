@@ -12,11 +12,12 @@ import {
   SettingsState,
   GeocodingResult,
   ActiveDriver,
-  RecentDestination
+  RecentDestination,
+  EarthquakeFeedItem
 } from '../types';
-import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship, Radio, Smartphone, Truck, ShieldAlert, Cpu, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, History, Clock, RotateCcw, Trash2, X, ChevronRight } from 'lucide-react';
+import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship, Radio, Smartphone, Truck, ShieldAlert, Cpu, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, History, Clock, RotateCcw, Trash2, X, ChevronRight, Activity, Waves } from 'lucide-react';
 import { t } from '../lib/i18n';
-import { fetchNasaEonetEvents, NasaEonetEvent, haversine, searchGeocoding, fetchActiveDrivers } from '../services/api';
+import { fetchNasaEonetEvents, NasaEonetEvent, haversine, searchGeocoding, fetchActiveDrivers, fetchLiveEarthquakes } from '../services/api';
 import { fetchLiveAircraftRadar, fetchLiveSeaVesselsRadar, LiveAircraft, LiveVessel } from '../services/liveRadarStore';
 import { getLiveGpsTrackableObjects, GpsTrackableObject, GpsTrackableCategory } from '../services/gpsTrackingStore';
 import { getRecentDestinations, saveRecentDestination, removeRecentDestination, clearRecentDestinations } from '../services/recentDestinationsStore';
@@ -62,6 +63,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
   const trackableGroupRef = useRef<L.LayerGroup | null>(null);
   const nasaLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const earthquakeGroupRef = useRef<L.LayerGroup | null>(null);
   const aircraftGroupRef = useRef<L.LayerGroup | null>(null);
   const vesselGroupRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.Polyline | null>(null);
@@ -78,12 +80,14 @@ export const MapView: React.FC<MapViewProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<any>(null);
   const [showNasaHazards, setShowNasaHazards] = useState(false);
+  const [showEarthquakes, setShowEarthquakes] = useState(true);
   const [showFlightRadar, setShowFlightRadar] = useState(true);
   const [showMaritimeRadar, setShowMaritimeRadar] = useState(true);
   const [showGpsTrackers, setShowGpsTrackers] = useState(true);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showTrackerMenu, setShowTrackerMenu] = useState(false);
   const [nasaEvents, setNasaEvents] = useState<NasaEonetEvent[]>([]);
+  const [earthquakes, setEarthquakes] = useState<EarthquakeFeedItem[]>([]);
   const [liveAircraft, setLiveAircraft] = useState<LiveAircraft[]>([]);
   const [liveVessels, setLiveVessels] = useState<LiveVessel[]>([]);
   const [liveGpsObjects, setLiveGpsObjects] = useState<GpsTrackableObject[]>([]);
@@ -193,6 +197,7 @@ export const MapView: React.FC<MapViewProps> = ({
       markersGroupRef.current = L.layerGroup().addTo(map);
       trackableGroupRef.current = L.layerGroup().addTo(map);
       nasaLayerGroupRef.current = L.layerGroup().addTo(map);
+      earthquakeGroupRef.current = L.layerGroup().addTo(map);
       aircraftGroupRef.current = L.layerGroup().addTo(map);
       vesselGroupRef.current = L.layerGroup().addTo(map);
 
@@ -274,6 +279,111 @@ export const MapView: React.FC<MapViewProps> = ({
       });
     }
   }, [showNasaHazards, nasaEvents]);
+
+  // Load USGS Real-Time Earthquakes (Poll every 30 seconds)
+  useEffect(() => {
+    let eqInterval: any;
+    const loadEarthquakes = async () => {
+      if (showEarthquakes) {
+        const res = await fetchLiveEarthquakes(0, userLocation, 35);
+        if (res && res.items) {
+          setEarthquakes(res.items);
+        }
+      }
+    };
+
+    loadEarthquakes();
+    eqInterval = setInterval(loadEarthquakes, 30000);
+    return () => {
+      if (eqInterval) clearInterval(eqInterval);
+    };
+  }, [showEarthquakes, userLocation]);
+
+  // Render USGS Real-Time Earthquakes on Map
+  useEffect(() => {
+    if (!earthquakeGroupRef.current) return;
+    earthquakeGroupRef.current.clearLayers();
+
+    if (showEarthquakes && earthquakes.length > 0) {
+      earthquakes.forEach((eq) => {
+        if (!eq.latitude || !eq.longitude) return;
+
+        let ringColor = '#22c55e'; // Green
+        let badgeBg = 'bg-emerald-600';
+        let animPulse = '';
+        if (eq.magnitude >= 6.5) {
+          ringColor = '#ef4444'; // Red
+          badgeBg = 'bg-red-600';
+          animPulse = 'animate-ping';
+        } else if (eq.magnitude >= 5.0) {
+          ringColor = '#f97316'; // Orange
+          badgeBg = 'bg-orange-600';
+          animPulse = 'animate-pulse';
+        } else if (eq.magnitude >= 4.0) {
+          ringColor = '#eab308'; // Yellow
+          badgeBg = 'bg-amber-600';
+        }
+
+        // 1. Epicenter Seismic Wave Ring (Circle)
+        const radiusMeters = Math.max(eq.magnitude * 15000, 30000);
+        const circle = L.circle([eq.latitude, eq.longitude], {
+          radius: radiusMeters,
+          color: ringColor,
+          weight: eq.magnitude >= 5.5 ? 2.5 : 1.5,
+          fillColor: ringColor,
+          fillOpacity: 0.15,
+          dashArray: eq.magnitude >= 6 ? '4, 4' : undefined
+        });
+        earthquakeGroupRef.current?.addLayer(circle);
+
+        // 2. Epicenter Center Marker with Magnitude
+        const icon = L.divIcon({
+          className: 'earthquake-marker-epicenter',
+          html: `<div class="relative flex items-center justify-center cursor-pointer group">
+                   <div class="absolute w-8 h-8 rounded-full ${badgeBg} opacity-40 ${animPulse}"></div>
+                   <div class="${badgeBg} text-white font-black text-[10px] px-1.5 py-0.5 rounded-full shadow-2xl border-2 border-white flex items-center gap-0.5 z-10 scale-100 group-hover:scale-110 transition-transform">
+                     <span>🌋</span>
+                     <span>M${eq.magnitude}</span>
+                     ${eq.tsunami ? '<span class="text-[9px]">🌊</span>' : ''}
+                   </div>
+                 </div>`,
+          iconSize: [40, 24],
+          iconAnchor: [20, 12]
+        });
+
+        const timeStr = new Date(eq.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = new Date(eq.time).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+        const m = L.marker([eq.latitude, eq.longitude], { icon }).bindPopup(
+          `<div class="p-2 font-sans text-slate-900 min-w-[220px]">
+             <div class="flex items-center justify-between border-b pb-1">
+               <span class="font-black text-sm text-red-600 flex items-center gap-1">
+                 🌋 M ${eq.magnitude.toFixed(1)} ${eq.magType.toUpperCase()}
+               </span>
+               <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeBg} text-white uppercase">
+                 ${eq.severityLevel}
+               </span>
+             </div>
+             <div class="font-bold text-xs text-slate-800 mt-1.5">${eq.place}</div>
+             <div class="text-[11px] text-slate-600 space-y-0.5 mt-1">
+               <div>📍 Kedalaman: <b>${eq.depthKm} km</b></div>
+               <div>⏱️ Masa: <b>${dateStr}, ${timeStr}</b></div>
+               ${eq.distanceKm ? `<div>📏 Jarak dari anda: <b class="text-blue-600">${eq.distanceKm} km</b></div>` : ''}
+               ${eq.tsunami ? '<div class="text-red-600 font-bold bg-red-50 p-1 rounded mt-1">🌊 AMARAN TSUNAMI AKTIF</div>' : ''}
+               ${eq.felt ? `<div>👥 Laporan dirasai: <b>${eq.felt} orang</b></div>` : ''}
+             </div>
+             <div class="mt-2 pt-1 border-t flex items-center justify-between">
+               <span class="text-[9px] text-slate-400 font-mono">USGS Seismic Feed</span>
+               <a href="${eq.url}" target="_blank" rel="noreferrer" class="text-[11px] font-bold text-blue-600 hover:underline">
+                 Lihat di USGS ↗
+               </a>
+             </div>
+           </div>`
+        );
+        earthquakeGroupRef.current?.addLayer(m);
+      });
+    }
+  }, [showEarthquakes, earthquakes]);
 
   // Polling interval for all live GPS trackable objects & radars (Every 2 seconds)
   useEffect(() => {
@@ -1225,6 +1335,24 @@ export const MapView: React.FC<MapViewProps> = ({
           {showMaritimeRadar && liveVessels.length > 0 && (
             <span className="absolute -top-1.5 -right-1.5 bg-cyan-400 text-slate-950 font-black text-[9px] px-1 rounded-full border border-slate-950 shadow">
               {liveVessels.length}
+            </span>
+          )}
+        </button>
+
+        {/* Live Earthquake & Seismic Hazard Radar Toggle Button */}
+        <button
+          onClick={() => setShowEarthquakes(!showEarthquakes)}
+          className={`relative w-12 h-12 rounded-2xl border flex items-center justify-center shadow-xl backdrop-blur-md transition-transform active:scale-95 ${
+            showEarthquakes
+              ? 'bg-rose-600 border-rose-400 text-white'
+              : 'bg-slate-900/90 border-slate-700/80 text-rose-400 hover:text-rose-300'
+          }`}
+          title="Toggle USGS Real-Time Earthquake & Seismic Radar"
+        >
+          <Activity className="w-6 h-6 animate-pulse" />
+          {showEarthquakes && earthquakes.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-rose-400 text-slate-950 font-black text-[9px] px-1 rounded-full border border-slate-950 shadow">
+              {earthquakes.length}
             </span>
           )}
         </button>
