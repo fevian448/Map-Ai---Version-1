@@ -214,6 +214,15 @@ export interface GeospatialAnalysisResult {
   generatedAt: number;
 }
 
+export interface RecentDestination {
+  id: string;
+  name: string;
+  point: GeoPoint;
+  timestamp: number;
+  category?: string;
+  address?: string;
+}
+
 export interface SettingsState {
   serverUrl: string;
   mapProvider: 'osm' | 'google' | 'nasa_gibs' | 'nasa_night';

@@ -11,13 +11,15 @@ import {
   SpeedCamera,
   SettingsState,
   GeocodingResult,
-  ActiveDriver
+  ActiveDriver,
+  RecentDestination
 } from '../types';
-import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship, Radio, Smartphone, Truck, ShieldAlert, Cpu, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
+import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship, Radio, Smartphone, Truck, ShieldAlert, Cpu, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut, History, Clock, RotateCcw, Trash2, X, ChevronRight } from 'lucide-react';
 import { t } from '../lib/i18n';
 import { fetchNasaEonetEvents, NasaEonetEvent, haversine, searchGeocoding, fetchActiveDrivers } from '../services/api';
 import { fetchLiveAircraftRadar, fetchLiveSeaVesselsRadar, LiveAircraft, LiveVessel } from '../services/liveRadarStore';
 import { getLiveGpsTrackableObjects, GpsTrackableObject, GpsTrackableCategory } from '../services/gpsTrackingStore';
+import { getRecentDestinations, saveRecentDestination, removeRecentDestination, clearRecentDestinations } from '../services/recentDestinationsStore';
 
 interface MapViewProps {
   userLocation: GeoPoint;
@@ -121,6 +123,61 @@ export const MapView: React.FC<MapViewProps> = ({
   // Dismissable Alerts State
   const [isTrackerBadgeDismissed, setIsTrackerBadgeDismissed] = useState(false);
   const [dismissedJamAlertIds, setDismissedJamAlertIds] = useState<string[]>([]);
+
+  // Recent Destinations State & Sync with localStorage (last 5 destinations)
+  const [recentDestinations, setRecentDestinations] = useState<RecentDestination[]>(() => getRecentDestinations());
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+  const [showRecentRibbon, setShowRecentRibbon] = useState<boolean>(true);
+
+  useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setRecentDestinations(e.detail);
+      } else {
+        setRecentDestinations(getRecentDestinations());
+      }
+    };
+    window.addEventListener('mapai_recent_destinations_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('mapai_recent_destinations_updated', handleUpdate);
+    };
+  }, []);
+
+  const handleSelectRecentDestination = (dest: RecentDestination) => {
+    onSelectDestination(dest.point, dest.name);
+    saveRecentDestination(dest.name, dest.point, dest.category, dest.address);
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearchFocused(false);
+    if (mapRef.current) {
+      mapRef.current.flyTo([dest.point.latitude, dest.point.longitude], 15, {
+        duration: 1.5
+      });
+    }
+  };
+
+  const handleRemoveRecent = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const updated = removeRecentDestination(id);
+    setRecentDestinations(updated);
+  };
+
+  const handleClearAllRecents = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearRecentDestinations();
+    setRecentDestinations([]);
+  };
+
+  const formatTimeAgo = (timestamp: number) => {
+    const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+    if (diffSec < 60) return settings.language === 'id' ? 'Baru saja' : 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h`;
+    const diffDays = Math.floor(diffHr / 24);
+    return `${diffDays}d`;
+  };
 
   // Initialize Map
   useEffect(() => {
@@ -678,10 +735,13 @@ export const MapView: React.FC<MapViewProps> = ({
     id: string;
     name: string;
     point: GeoPoint;
+    subtitle?: string;
   }) => {
     onSelectDestination(item.point, item.name);
+    saveRecentDestination(item.name, item.point, 'search', item.subtitle);
     setSearchQuery('');
     setSearchResults([]);
+    setIsSearchFocused(false);
     if (mapRef.current) {
       mapRef.current.flyTo([item.point.latitude, item.point.longitude], 14, {
         duration: 1.5
@@ -708,23 +768,48 @@ export const MapView: React.FC<MapViewProps> = ({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onChange={(e) => {
+              setIsSearchFocused(true);
+              handleSearch(e.target.value);
+            }}
             placeholder={t('search_placeholder', settings.language)}
             className="w-full bg-transparent border-none px-3 py-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none"
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
-              onClick={() => handleSearch('')}
+              onClick={() => {
+                handleSearch('');
+                setIsSearchFocused(false);
+              }}
               className="px-2 text-xs text-slate-400 hover:text-white"
             >
               Clear
             </button>
-          )}
+          ) : recentDestinations.length > 0 ? (
+            <button
+              onClick={() => setIsSearchFocused(!isSearchFocused)}
+              className={`p-1.5 mr-1 rounded-xl text-xs flex items-center gap-1 transition-all ${
+                isSearchFocused
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                  : 'text-slate-400 hover:text-purple-300 hover:bg-slate-800'
+              }`}
+              title="Tunjuk / Tutup Destinasi Terkini"
+            >
+              <History className="w-4 h-4" />
+              <span className="text-[10px] font-bold font-mono bg-purple-950/80 text-purple-300 px-1 py-0.2 rounded border border-purple-500/30">
+                {recentDestinations.length}
+              </span>
+            </button>
+          ) : null}
         </div>
 
-        {/* Search Results Dropdown & Worldwide Shortcuts */}
+        {/* Search Results Dropdown & Recent Destinations Popup */}
         {searchResults.length > 0 ? (
-          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-2 shadow-2xl max-h-64 overflow-y-auto space-y-1">
+          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-2 shadow-2xl max-h-72 overflow-y-auto space-y-1">
+            <div className="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Hasil Carian ({searchResults.length})
+            </div>
             {searchResults.map((place) => (
               <button
                 key={place.id}
@@ -748,6 +833,82 @@ export const MapView: React.FC<MapViewProps> = ({
               </button>
             ))}
           </div>
+        ) : isSearchFocused && recentDestinations.length > 0 && !searchQuery ? (
+          <div className="bg-slate-900/95 backdrop-blur-md border border-purple-900/60 rounded-2xl p-2 shadow-2xl max-h-72 overflow-y-auto space-y-1 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between px-2 py-1 border-b border-slate-800/80 mb-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+                <History className="w-3.5 h-3.5 text-purple-400" />
+                <span>{t('recent_destinations', settings.language)}</span>
+                <span className="text-[10px] bg-purple-950 text-purple-300 font-mono px-1.5 py-0.2 rounded border border-purple-500/30">
+                  {recentDestinations.length}/5
+                </span>
+              </div>
+              <button
+                onClick={handleClearAllRecents}
+                className="text-[11px] font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1"
+                title={t('clear_recents', settings.language)}
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>{t('clear_recents', settings.language)}</span>
+              </button>
+            </div>
+            {recentDestinations.map((dest) => {
+              const distKm = userLocation ? (haversine(userLocation, dest.point) / 1000).toFixed(1) : null;
+              return (
+                <div
+                  key={dest.id}
+                  onClick={() => handleSelectRecentDestination(dest)}
+                  className="w-full p-2.5 rounded-xl bg-slate-950/50 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/50 flex items-center justify-between text-left transition-all cursor-pointer group"
+                >
+                  <div className="min-w-0 pr-2 flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-100 group-hover:text-purple-200 transition-colors truncate">
+                        {dest.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px]">
+                        {distKm && (
+                          <span className="text-cyan-400 font-semibold font-mono">
+                            {distKm} km away
+                          </span>
+                        )}
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-400 font-mono">
+                          {formatTimeAgo(dest.timestamp)}
+                        </span>
+                      </div>
+                      {dest.address && (
+                        <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {dest.address}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectRecentDestination(dest);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-black flex items-center gap-1 shadow transition-all active:scale-95"
+                      title={t('quick_reroute', settings.language)}
+                    >
+                      <span>⚡ {t('quick_reroute', settings.language)}</span>
+                    </button>
+                    <button
+                      onClick={(e) => handleRemoveRecent(e, dest.id)}
+                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
+                      title="Padam"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : null}
 
         {/* Categories Chips (Clean & Spacious) */}
@@ -770,6 +931,53 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })}
         </div>
+
+        {/* Recent Destinations Quick-Access Ribbon (Direct Quick Re-routing) */}
+        {recentDestinations.length > 0 && showRecentRibbon && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-purple-950/90 border border-purple-500/50 text-purple-200 text-[11px] font-extrabold shrink-0 shadow-md">
+              <History className="w-3.5 h-3.5 text-purple-400" />
+              <span>{t('recent_destinations', settings.language)}:</span>
+            </div>
+            {recentDestinations.map((dest) => {
+              const distKm = userLocation ? (haversine(userLocation, dest.point) / 1000).toFixed(1) : null;
+              return (
+                <div
+                  key={dest.id}
+                  onClick={() => handleSelectRecentDestination(dest)}
+                  className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-purple-900/40 border border-slate-700/80 hover:border-purple-500/60 text-slate-200 text-xs font-semibold shrink-0 cursor-pointer backdrop-blur-md shadow-md transition-all active:scale-95"
+                  title={`Re-route to ${dest.name}`}
+                >
+                  <Clock className="w-3 h-3 text-cyan-400 group-hover:text-purple-400 transition-colors shrink-0" />
+                  <span className="truncate max-w-[110px] font-bold text-slate-100">{dest.name}</span>
+                  {distKm && (
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold shrink-0">
+                      {distKm}km
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1 py-0.2 rounded font-bold group-hover:bg-purple-500 group-hover:text-white transition-all shrink-0">
+                    ⚡
+                  </span>
+                  <button
+                    onClick={(e) => handleRemoveRecent(e, dest.id)}
+                    className="text-slate-500 hover:text-red-400 p-0.5 rounded-full hover:bg-slate-800 transition-colors ml-0.5"
+                    title="Padam"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              onClick={handleClearAllRecents}
+              className="px-2 py-1 rounded-xl bg-slate-900/80 hover:bg-red-950/80 border border-slate-800 hover:border-red-600/60 text-slate-400 hover:text-red-300 text-[10px] font-bold shrink-0 transition-all flex items-center gap-1"
+              title={t('clear_recents', settings.language)}
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>{t('clear_recents', settings.language)}</span>
+            </button>
+          </div>
+        )}
 
         {/* Live Traffic Jam Banner Alert (Dismissable & Skip/Close Button) */}
         {(() => {

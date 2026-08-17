@@ -29,6 +29,7 @@ import {
 } from './services/api';
 import { speakPrompt, playSpeedWarning } from './lib/audio';
 import { autoDownloadOfflineOnFirstInstall, getOfflineMapPackMeta } from './services/offlineMapStore';
+import { saveRecentDestination } from './services/recentDestinationsStore';
 import { NavigationHeader } from './components/NavigationHeader';
 import { MapView } from './components/MapView';
 import { AlertsTab } from './components/AlertsTab';
@@ -312,9 +313,14 @@ export function App() {
       return;
     }
 
+    const finalName = name || 'Selected Destination';
     setDestination(point);
-    setDestinationName(name || 'Selected Destination');
+    setDestinationName(finalName);
     setActiveTab('map');
+
+    // Save to Recent Destinations (persisted in localStorage, max 5)
+    saveRecentDestination(finalName, point);
+    addLog('NAVIGATION', 'info', `Destination set: ${finalName} [${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}]`);
 
     const calculatedRoute = await getDirectionsRoute(userLocation, point);
     setRoute(calculatedRoute);

@@ -44,7 +44,11 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     email_login: 'Email Login',
     vehicle_type: 'Vehicle & Live Map Marker',
     floating_copilot: 'Floating AI Copilot',
-    system_logs: 'System & Telemetry Logs'
+    system_logs: 'System & Telemetry Logs',
+    recent_destinations: 'Recent Destinations',
+    clear_recents: 'Clear History',
+    no_recent_destinations: 'No recent destinations yet',
+    quick_reroute: 'Quick Re-route'
   },
   id: {
     nav_map: 'Peta',
@@ -89,7 +93,11 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     email_login: 'Log Masuk E-mel',
     vehicle_type: 'Jenis Kenderaan & Ikon Peta',
     floating_copilot: 'Pembantu AI Terapung (Boleh Drag)',
-    system_logs: 'Log Sistem & Telemetri'
+    system_logs: 'Log Sistem & Telemetri',
+    recent_destinations: 'Destinasi Terkini',
+    clear_recents: 'Padam Sejarah',
+    no_recent_destinations: 'Tiada destinasi terkini lagi',
+    quick_reroute: 'Laluan Pantas'
   },
   es: {
     nav_map: 'Mapa',
@@ -134,7 +142,11 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     email_login: 'Inicio con Email',
     vehicle_type: 'Tipo de Vehículo y Marcador',
     floating_copilot: 'Copiloto IA Flotante Movible',
-    system_logs: 'Registros del Sistema'
+    system_logs: 'Registros del Sistema',
+    recent_destinations: 'Destinos Recientes',
+    clear_recents: 'Borrar Historial',
+    no_recent_destinations: 'Sin destinos recientes',
+    quick_reroute: 'Recalcular Ruta'
   },
   ar: {
     nav_map: 'الخريطة',
@@ -179,7 +191,11 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     email_login: 'تسجيل بالبريد',
     vehicle_type: 'نوع المركبة وأيقونة الخريطة',
     floating_copilot: 'مساعد الذكاء العائم القابل للتحريك',
-    system_logs: 'سجلات النظام'
+    system_logs: 'سجلات النظام',
+    recent_destinations: 'الوجهات الأخيرة',
+    clear_recents: 'مسح السجل',
+    no_recent_destinations: 'لا توجد وجهات أخيرة',
+    quick_reroute: 'إعادة التوجيه السريع'
   },
   fr: {
     nav_map: 'Carte',
@@ -224,7 +240,11 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     email_login: 'Connexion Email',
     vehicle_type: 'Type de Véhicule & Marqueur',
     floating_copilot: 'Copilote IA Flottant Déplaçable',
-    system_logs: 'Journaux Système'
+    system_logs: 'Journaux Système',
+    recent_destinations: 'Destinations Récentes',
+    clear_recents: 'Effacer l\'historique',
+    no_recent_destinations: 'Aucune destination récente',
+    quick_reroute: 'Recalculer l\'itinéraire'
   },
   zh: {
     nav_map: '地图',
@@ -269,7 +289,11 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     email_login: '邮箱登录',
     vehicle_type: '车辆类型与地图图标',
     floating_copilot: '可拖拽浮动AI助手',
-    system_logs: '系统与日志监控'
+    system_logs: '系统与日志监控',
+    recent_destinations: '最近目的地',
+    clear_recents: '清除历史',
+    no_recent_destinations: '暂无最近目的地',
+    quick_reroute: '快速重新规划'
   }
 };
 
