@@ -54,7 +54,17 @@
   background-color: #0f172a !important;
 }
 
-.user-marker, .alert-marker, .place-marker, .cam-marker, .dest-marker {
+.user-marker, .alert-marker, .place-marker, .cam-marker, .dest-marker, .gps-trackable-marker, .active-driver-marker, .aircraft-marker, .vessel-marker {
   background: transparent !important;
   border: none !important;
+  transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes mapai-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-mapai-float {
+  animation: mapai-float 2.5s ease-in-out infinite;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ChatMessage, GeoPoint, Place, SettingsState } from '../types';
-import { Bot, Send, User, Sparkles, Navigation, MapPin, Compass, ArrowRight, Cpu, Users, Store, MessageSquare, ShieldAlert, Bike, Plus, CheckCircle2 } from 'lucide-react';
+import { ChatMessage, GeoPoint, Place, SettingsState, SubscriptionState } from '../types';
+import { Bot, Send, User, Sparkles, Navigation, MapPin, Compass, ArrowRight, Cpu, Users, Store, MessageSquare, ShieldAlert, Bike, Plus, CheckCircle2, Crown, Zap, BarChart3 } from 'lucide-react';
 import { sendChatMessage, searchGeocoding } from '../services/api';
 import { t } from '../lib/i18n';
 
@@ -10,6 +10,10 @@ interface ChatTabProps {
   places: Place[];
   onSelectDestination: (point: GeoPoint | null, name: string) => void;
   onStartNavigation: () => void;
+  subscription: SubscriptionState;
+  onOpenUpgradeModal: () => void;
+  onOpenGeospatialModal: () => void;
+  onUpdateSubscription?: (sub: SubscriptionState) => void;
 }
 
 interface ChatDestinationAction {
@@ -32,10 +36,17 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   userLocation,
   places,
   onSelectDestination,
-  onStartNavigation
+  onStartNavigation,
+  subscription,
+  onOpenUpgradeModal,
+  onOpenGeospatialModal,
+  onUpdateSubscription
 }) => {
   const [activeTabMode, setActiveTabMode] = useState<'AI_COPILOT' | 'GROUP_CHANNELS'>('GROUP_CHANNELS');
   const [selectedChannel, setSelectedChannel] = useState<'TRAFFIC' | 'BUSINESS_PROMO' | 'RIDERS' | 'EMERGENCY'>('BUSINESS_PROMO');
+
+  const isPro = subscription.tier === 'PRO' || subscription.tier === 'ENTERPRISE';
+  const remainingFreeQueries = Math.max(0, 15 - (subscription.queriesUsedToday || 0));
 
   // AI Copilot state
   const [messages, setMessages] = useState<(ChatMessage & { destination?: ChatDestinationAction })[]>([
@@ -186,6 +197,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
     e.preventDefault();
     if (!input.trim() || loading) return;
 
+    // Check if free user exceeded quota
+    if (!isPro && (subscription.queriesUsedToday || 0) >= 15) {
+      onOpenUpgradeModal();
+      return;
+    }
+
     const userText = input.trim();
     setInput('');
 
@@ -193,12 +210,23 @@ export const ChatTab: React.FC<ChatTabProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
-    const replyText = await sendChatMessage(
+    const chatResponse = await sendChatMessage(
       userText,
       settings.aiProvider || 'gemini_flash',
       settings.aiApiKey,
-      settings.aiCustomEndpoint
+      settings.aiCustomEndpoint,
+      'default_user',
+      subscription.tier
     );
+
+    if (onUpdateSubscription && chatResponse.queriesUsed !== undefined) {
+      onUpdateSubscription({
+        ...subscription,
+        queriesUsedToday: chatResponse.queriesUsed
+      });
+    }
+
+    const replyText = chatResponse.text;
 
     let detectedDest: ChatDestinationAction | undefined = undefined;
     const lowerText = userText.toLowerCase();
@@ -434,8 +462,54 @@ export const ChatTab: React.FC<ChatTabProps> = ({
       ) : (
         /* VIEW MODE 2: AI NAVIGATION COPILOT */
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Subscription & Daily Quota Status Banner */}
+          <div className={`p-2.5 border-b text-xs flex items-center justify-between gap-2 shrink-0 ${
+            isPro
+              ? 'bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-900 border-amber-500/30 text-amber-200'
+              : 'bg-slate-900/95 border-slate-800 text-slate-300'
+          }`}>
+            <div className="flex items-center gap-2 truncate">
+              {isPro ? (
+                <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                  <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>MapAi PRO • Kuota Tanpa Had (Gemini Pro)</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Free Tier: <strong className="text-white">{15 - remainingFreeQueries} / 15</strong> kuota AI harian</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={onOpenGeospatialModal}
+                className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center gap-1 transition-all"
+                title="Analisis Demografi & Hotspot Bisnes Kawasan"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">Analisis Geospatial</span>
+              </button>
+
+              {!isPro ? (
+                <button
+                  onClick={onOpenUpgradeModal}
+                  className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-[11px] font-black flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                >
+                  <Crown className="w-3 h-3" />
+                  <span>Naik Taraf PRO</span>
+                </button>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold border border-amber-500/30">
+                  PRO ACTIVE
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* Quick Destination Chips */}
-          <div className="bg-slate-900/60 border-b border-slate-800 p-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+          <div className="bg-slate-900/60 border-b border-slate-800 p-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 pl-1">
               <Navigation className="w-3 h-3 text-cyan-400" />
               <span>Quick Go:</span>

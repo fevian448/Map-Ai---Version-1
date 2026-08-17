@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SettingsState, GeoPoint, Place } from '../types';
-import { Bot, Send, X, Minimize2, Sparkles, Navigation, MapPin, Mic, Pin, Move, GripHorizontal } from 'lucide-react';
+import { SettingsState, GeoPoint, Place, SubscriptionState } from '../types';
+import { Bot, Send, X, Minimize2, Sparkles, Navigation, MapPin, Mic, Pin, Move, GripHorizontal, Crown, Zap } from 'lucide-react';
 import { sendChatMessage, searchGeocoding } from '../services/api';
 import { t } from '../lib/i18n';
 
@@ -16,6 +16,9 @@ interface FloatingAiCopilotProps {
     message: string
   ) => void;
   onToggleDock: () => void;
+  subscription?: SubscriptionState;
+  onOpenUpgradeModal?: () => void;
+  onUpdateSubscription?: (sub: SubscriptionState) => void;
 }
 
 export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({
@@ -25,11 +28,28 @@ export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({
   onSelectDestination,
   onStartNavigation,
   onAddLog,
-  onToggleDock
+  onToggleDock,
+  subscription = {
+    tier: 'FREE',
+    dailyQueriesLimit: 15,
+    queriesUsedToday: 0,
+    lastResetDate: new Date().toISOString().split('T')[0]
+  },
+  onOpenUpgradeModal,
+  onUpdateSubscription
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const currentSub = subscription || {
+    tier: 'FREE',
+    dailyQueriesLimit: 15,
+    queriesUsedToday: 0,
+    lastResetDate: new Date().toISOString().split('T')[0]
+  };
+  const isPro = currentSub.tier === 'PRO' || currentSub.tier === 'ENTERPRISE';
+  const remainingFreeQueries = Math.max(0, 15 - (currentSub.queriesUsedToday || 0));
+
   const [messages, setMessages] = useState<
     { role: 'user' | 'assistant'; text: string; actionDest?: { name: string; point: GeoPoint } }[]
   >([
@@ -146,6 +166,13 @@ export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({
     const textToSend = (queryText || input).trim();
     if (!textToSend || loading) return;
 
+    if (!isPro && (currentSub.queriesUsedToday || 0) >= 15) {
+      if (onOpenUpgradeModal) {
+        onOpenUpgradeModal();
+      }
+      return;
+    }
+
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
     setLoading(true);
@@ -160,8 +187,17 @@ export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({
         textToSend,
         settings.aiProvider || 'gemini_flash',
         settings.aiApiKey,
-        settings.aiCustomEndpoint
+        settings.aiCustomEndpoint,
+        'default_user',
+        currentSub.tier
       );
+
+      if (onUpdateSubscription && response.queriesUsed !== undefined) {
+        onUpdateSubscription({
+          ...currentSub,
+          queriesUsedToday: response.queriesUsed
+        });
+      }
 
       let actionDest: { name: string; point: GeoPoint } | undefined = undefined;
       const lower = textToSend.toLowerCase();
@@ -198,7 +234,7 @@ export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({
         ...prev,
         {
           role: 'assistant',
-          text: response || 'I have checked your request and updated the map route.',
+          text: response.text || 'I have checked your request and updated the map route.',
           actionDest
         }
       ]);

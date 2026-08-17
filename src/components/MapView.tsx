@@ -13,10 +13,11 @@ import {
   GeocodingResult,
   ActiveDriver
 } from '../types';
-import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship } from 'lucide-react';
+import { Navigation2, Search, Plus, MapPin, Compass, LocateFixed, Fuel, Utensils, ParkingSquare, Building2, Banknote, Globe, Flame, Layers, Loader2, Users, Plane, Ship, Radio, Smartphone, Truck, ShieldAlert, Cpu, Sparkles, SlidersHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { t } from '../lib/i18n';
 import { fetchNasaEonetEvents, NasaEonetEvent, haversine, searchGeocoding, fetchActiveDrivers } from '../services/api';
 import { fetchLiveAircraftRadar, fetchLiveSeaVesselsRadar, LiveAircraft, LiveVessel } from '../services/liveRadarStore';
+import { getLiveGpsTrackableObjects, GpsTrackableObject, GpsTrackableCategory } from '../services/gpsTrackingStore';
 
 interface MapViewProps {
   userLocation: GeoPoint;
@@ -57,6 +58,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
+  const trackableGroupRef = useRef<L.LayerGroup | null>(null);
   const nasaLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const aircraftGroupRef = useRef<L.LayerGroup | null>(null);
   const vesselGroupRef = useRef<L.LayerGroup | null>(null);
@@ -76,10 +78,45 @@ export const MapView: React.FC<MapViewProps> = ({
   const [showNasaHazards, setShowNasaHazards] = useState(false);
   const [showFlightRadar, setShowFlightRadar] = useState(true);
   const [showMaritimeRadar, setShowMaritimeRadar] = useState(true);
+  const [showGpsTrackers, setShowGpsTrackers] = useState(true);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const [showTrackerMenu, setShowTrackerMenu] = useState(false);
   const [nasaEvents, setNasaEvents] = useState<NasaEonetEvent[]>([]);
   const [liveAircraft, setLiveAircraft] = useState<LiveAircraft[]>([]);
   const [liveVessels, setLiveVessels] = useState<LiveVessel[]>([]);
+  const [liveGpsObjects, setLiveGpsObjects] = useState<GpsTrackableObject[]>([]);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('all');
+
+  // Icon Size & Animated Movement Settings
+  type IconScale = 'sm' | 'md' | 'lg' | 'xl';
+  const [iconScale, setIconScale] = useState<IconScale>(() => {
+    return (localStorage.getItem('mapai_icon_scale') as IconScale) || 'md';
+  });
+  const [isAnimatedMotion, setIsAnimatedMotion] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mapai_icon_motion');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleSetIconScale = (scale: IconScale) => {
+    setIconScale(scale);
+    localStorage.setItem('mapai_icon_scale', scale);
+  };
+
+  const handleToggleMotion = () => {
+    setIsAnimatedMotion((prev) => {
+      const next = !prev;
+      localStorage.setItem('mapai_icon_motion', String(next));
+      return next;
+    });
+  };
+
+  const scaleMultipliers: Record<IconScale, number> = {
+    sm: 0.75,
+    md: 1.0,
+    lg: 1.35,
+    xl: 1.75
+  };
+  const currentScale = scaleMultipliers[iconScale] || 1.0;
 
   // Dismissable Alerts State
   const [isTrackerBadgeDismissed, setIsTrackerBadgeDismissed] = useState(false);
@@ -97,6 +134,7 @@ export const MapView: React.FC<MapViewProps> = ({
       });
 
       markersGroupRef.current = L.layerGroup().addTo(map);
+      trackableGroupRef.current = L.layerGroup().addTo(map);
       nasaLayerGroupRef.current = L.layerGroup().addTo(map);
       aircraftGroupRef.current = L.layerGroup().addTo(map);
       vesselGroupRef.current = L.layerGroup().addTo(map);
@@ -180,28 +218,114 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [showNasaHazards, nasaEvents]);
 
-  // Live Aircraft & Sea Vessels Radar polling interval (Every 2 seconds)
+  // Polling interval for all live GPS trackable objects & radars (Every 2 seconds)
   useEffect(() => {
     let interval: any;
 
-    const pollRadar = async () => {
-      if (showFlightRadar && userLocation) {
-        const flights = await fetchLiveAircraftRadar(userLocation);
-        setLiveAircraft(flights);
-      }
-      if (showMaritimeRadar && userLocation) {
-        const vessels = await fetchLiveSeaVesselsRadar(userLocation);
-        setLiveVessels(vessels);
+    const pollAllTrackables = async () => {
+      if (userLocation) {
+        // 1. All GPS trackable objects (Phones, Riders, Fleet, Emergency, Asset tags, Satellites)
+        if (showGpsTrackers) {
+          const objs = getLiveGpsTrackableObjects(userLocation);
+          setLiveGpsObjects(objs);
+        }
+
+        // 2. Air Traffic Flights
+        if (showFlightRadar) {
+          const flights = await fetchLiveAircraftRadar(userLocation);
+          setLiveAircraft(flights);
+        }
+
+        // 3. Maritime Sea Vessels
+        if (showMaritimeRadar) {
+          const vessels = await fetchLiveSeaVesselsRadar(userLocation);
+          setLiveVessels(vessels);
+        }
       }
     };
 
-    pollRadar();
-    interval = setInterval(pollRadar, 2000);
+    pollAllTrackables();
+    interval = setInterval(pollAllTrackables, 2000);
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [showFlightRadar, showMaritimeRadar, userLocation]);
+  }, [showGpsTrackers, showFlightRadar, showMaritimeRadar, userLocation]);
+
+  // Render All Live GPS Trackable Objects on Map
+  useEffect(() => {
+    if (!trackableGroupRef.current) return;
+    trackableGroupRef.current.clearLayers();
+
+    if (showGpsTrackers && liveGpsObjects.length > 0) {
+      const filtered = activeCategoryFilter === 'all'
+        ? liveGpsObjects
+        : liveGpsObjects.filter((o) => o.category === activeCategoryFilter);
+
+      const s = currentScale;
+
+      filtered.forEach((item) => {
+        let badgeBg = 'bg-slate-900 border-cyan-400 text-cyan-200';
+        let pingColor = 'bg-cyan-400';
+
+        if (item.category === 'emergency') {
+          badgeBg = 'bg-red-950 border-red-500 text-red-200 animate-pulse';
+          pingColor = 'bg-red-500';
+        } else if (item.category === 'rider') {
+          badgeBg = 'bg-emerald-950 border-emerald-400 text-emerald-200';
+          pingColor = 'bg-emerald-400';
+        } else if (item.category === 'fleet') {
+          badgeBg = 'bg-amber-950 border-amber-400 text-amber-200';
+          pingColor = 'bg-amber-400';
+        } else if (item.category === 'phone') {
+          badgeBg = 'bg-indigo-950 border-indigo-400 text-indigo-200';
+          pingColor = 'bg-indigo-400';
+        } else if (item.category === 'satellite') {
+          badgeBg = 'bg-purple-950 border-purple-400 text-purple-200';
+          pingColor = 'bg-purple-400';
+        }
+
+        const icon = L.divIcon({
+          className: 'gps-trackable-marker',
+          html: `<div class="relative group cursor-pointer ${isAnimatedMotion ? 'animate-mapai-float' : ''}" style="transform: scale(${s}); transform-origin: center;">
+                   <div class="absolute -inset-1 rounded-full ${pingColor}/50 ${isAnimatedMotion ? 'animate-ping' : ''}"></div>
+                   <div class="relative ${badgeBg} border-2 text-xs px-2 py-0.5 rounded-xl shadow-2xl flex items-center gap-1 backdrop-blur-md hover:scale-110 transition-all">
+                     <span class="text-sm">${item.emoji}</span>
+                     <span class="text-[10px] font-black truncate max-w-[75px]">${item.name.split('(')[0].trim()}</span>
+                   </div>
+                 </div>`,
+          iconSize: [Math.round(95 * s), Math.round(26 * s)],
+          iconAnchor: [Math.round(47.5 * s), Math.round(13 * s)]
+        });
+
+        const popupContent = `
+          <div class="p-2 font-sans text-slate-900 bg-white rounded-xl shadow-xl min-w-[210px]">
+            <div class="flex items-center justify-between border-b pb-1.5 gap-2">
+              <span class="font-extrabold text-slate-900 text-xs flex items-center gap-1">
+                <span>${item.emoji}</span>
+                <span>${item.name}</span>
+              </span>
+              <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black font-mono">${item.status}</span>
+            </div>
+            <div class="text-[11px] text-slate-600 mt-1.5 font-semibold">
+              🏷️ Jenis: <strong>${item.typeLabel}</strong>
+            </div>
+            ${item.details.modelOrMake ? `<div class="text-[11px] text-slate-600 mt-0.5">📦 Model: <strong>${item.details.modelOrMake}</strong></div>` : ''}
+            ${item.details.operatorOrOwner ? `<div class="text-[11px] text-slate-600 mt-0.5">🏢 Pemilik: <strong>${item.details.operatorOrOwner}</strong></div>` : ''}
+            <div class="text-[10px] text-slate-600 mt-1 grid grid-cols-2 gap-1 font-mono bg-slate-50 p-1.5 rounded border border-slate-200">
+              <div>Kelajuan: <strong>${item.speedKmh} km/h</strong></div>
+              <div>Bateri: <strong>${item.batteryPercent !== undefined ? `${item.batteryPercent}%` : 'N/A'}</strong></div>
+              <div class="col-span-2 text-[9px] text-slate-500 truncate">📡 Chipset: ${item.gpsChipset}</div>
+              <div class="col-span-2 text-[9px] text-emerald-700 font-bold">⏱️ ${item.details.lastPingText}</div>
+            </div>
+          </div>
+        `;
+
+        const m = L.marker([item.point.latitude, item.point.longitude], { icon }).bindPopup(popupContent);
+        trackableGroupRef.current?.addLayer(m);
+      });
+    }
+  }, [showGpsTrackers, liveGpsObjects, activeCategoryFilter, iconScale, isAnimatedMotion]);
 
   // Render Live Aircraft on Map
   useEffect(() => {
@@ -209,10 +333,11 @@ export const MapView: React.FC<MapViewProps> = ({
     aircraftGroupRef.current.clearLayers();
 
     if (showFlightRadar && liveAircraft.length > 0) {
+      const s = currentScale;
       liveAircraft.forEach((ac) => {
         const icon = L.divIcon({
           className: 'aircraft-marker',
-          html: `<div class="relative group cursor-pointer">
+          html: `<div class="relative group cursor-pointer ${isAnimatedMotion ? 'animate-mapai-float' : ''}" style="transform: scale(${s}); transform-origin: center;">
                    <div class="bg-sky-950/90 border-2 border-sky-400 text-sky-200 text-xs px-2 py-1 rounded-xl shadow-2xl flex items-center gap-1 backdrop-blur-md hover:scale-110 transition-all" style="transform: rotate(${ac.headingDeg - 90}deg);">
                      <span class="text-base">${ac.emoji}</span>
                    </div>
@@ -220,8 +345,8 @@ export const MapView: React.FC<MapViewProps> = ({
                      ${ac.callsign} • ${ac.altitudeFt}ft
                    </div>
                  </div>`,
-          iconSize: [42, 32],
-          iconAnchor: [21, 16]
+          iconSize: [Math.round(42 * s), Math.round(32 * s)],
+          iconAnchor: [Math.round(21 * s), Math.round(16 * s)]
         });
 
         const m = L.marker([ac.point.latitude, ac.point.longitude], { icon }).bindPopup(
@@ -245,7 +370,7 @@ export const MapView: React.FC<MapViewProps> = ({
         aircraftGroupRef.current?.addLayer(m);
       });
     }
-  }, [showFlightRadar, liveAircraft]);
+  }, [showFlightRadar, liveAircraft, iconScale, isAnimatedMotion]);
 
   // Render Live Sea Vessels on Map
   useEffect(() => {
@@ -253,10 +378,11 @@ export const MapView: React.FC<MapViewProps> = ({
     vesselGroupRef.current.clearLayers();
 
     if (showMaritimeRadar && liveVessels.length > 0) {
+      const s = currentScale;
       liveVessels.forEach((v) => {
         const icon = L.divIcon({
           className: 'vessel-marker',
-          html: `<div class="relative group cursor-pointer">
+          html: `<div class="relative group cursor-pointer ${isAnimatedMotion ? 'animate-mapai-float' : ''}" style="transform: scale(${s}); transform-origin: center;">
                    <div class="bg-blue-950/90 border-2 border-cyan-400 text-cyan-200 text-xs px-2 py-1 rounded-xl shadow-2xl flex items-center gap-1 backdrop-blur-md hover:scale-110 transition-all">
                      <span class="text-base">${v.emoji}</span>
                    </div>
@@ -264,8 +390,8 @@ export const MapView: React.FC<MapViewProps> = ({
                      ${v.flag} ${v.name}
                    </div>
                  </div>`,
-          iconSize: [40, 32],
-          iconAnchor: [20, 16]
+          iconSize: [Math.round(40 * s), Math.round(32 * s)],
+          iconAnchor: [Math.round(20 * s), Math.round(16 * s)]
         });
 
         const m = L.marker([v.point.latitude, v.point.longitude], { icon }).bindPopup(
@@ -286,7 +412,7 @@ export const MapView: React.FC<MapViewProps> = ({
         vesselGroupRef.current?.addLayer(m);
       });
     }
-  }, [showMaritimeRadar, liveVessels]);
+  }, [showMaritimeRadar, liveVessels, iconScale, isAnimatedMotion]);
 
   // Update user location marker & pan
   useEffect(() => {
@@ -397,18 +523,19 @@ export const MapView: React.FC<MapViewProps> = ({
 
     // 4. Live Active Online Drivers & Riders (Internet / Server Connected)
     if (activeDrivers && activeDrivers.length > 0) {
+      const s = currentScale;
       activeDrivers.forEach((drv) => {
         const icon = L.divIcon({
           className: 'active-driver-marker',
-          html: `<div class="relative group cursor-pointer">
-                   <div class="absolute -inset-1 rounded-full bg-emerald-500/40 animate-ping"></div>
+          html: `<div class="relative group cursor-pointer ${isAnimatedMotion ? 'animate-mapai-float' : ''}" style="transform: scale(${s}); transform-origin: center;">
+                   <div class="absolute -inset-1 rounded-full bg-emerald-500/40 ${isAnimatedMotion ? 'animate-ping' : ''}"></div>
                    <div class="relative bg-slate-900 border-2 border-emerald-400 text-white text-xs px-2 py-0.5 rounded-xl shadow-xl flex items-center gap-1 backdrop-blur-md">
                      <span class="text-sm">${drv.vehicleEmoji}</span>
                      <span class="text-[10px] font-extrabold text-emerald-300 truncate max-w-[70px]">${drv.name.split('_')[0]}</span>
                    </div>
                  </div>`,
-          iconSize: [85, 26],
-          iconAnchor: [42, 13]
+          iconSize: [Math.round(85 * s), Math.round(26 * s)],
+          iconAnchor: [Math.round(42.5 * s), Math.round(13 * s)]
         });
 
         const m = L.marker([drv.point.latitude, drv.point.longitude], { icon }).bindPopup(
@@ -440,7 +567,7 @@ export const MapView: React.FC<MapViewProps> = ({
         .bindPopup(`<b>${destinationName || 'Destination'}</b>`);
       markersGroupRef.current?.addLayer(m);
     }
-  }, [alerts, places, speedCameras, destination, activeDrivers]);
+  }, [alerts, places, speedCameras, destination, activeDrivers, iconScale, isAnimatedMotion]);
 
   // Render Route Polyline
   useEffect(() => {
@@ -470,7 +597,7 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [route, isNavigating]);
 
-  // Quick Search Filter & Global Geocoding
+  // Quick Search Filter & Global Worldwide Geocoding
   const handleSearch = (q: string) => {
     setSearchQuery(q);
     if (searchTimeoutRef.current) {
@@ -481,6 +608,27 @@ export const MapView: React.FC<MapViewProps> = ({
       setSearchResults([]);
       setIsSearching(false);
       return;
+    }
+
+    // Check if query is latitude, longitude coordinate format (e.g., "3.139, 101.686")
+    const coordMatch = q.trim().match(/^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lon = parseFloat(coordMatch[3]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        const coordPoint: GeoPoint = { latitude: lat, longitude: lon };
+        setSearchResults([
+          {
+            id: `coord_${lat}_${lon}`,
+            name: `📍 Coordinate: ${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+            subtitle: 'Worldwide Custom Coordinates Target',
+            point: coordPoint,
+            distanceMeters: userLocation ? haversine(userLocation, coordPoint) : undefined
+          }
+        ]);
+        setIsSearching(false);
+        return;
+      }
     }
 
     // 1. Instant local POI filter
@@ -497,7 +645,7 @@ export const MapView: React.FC<MapViewProps> = ({
     setSearchResults(localFiltered);
     setIsSearching(true);
 
-    // 2. Debounced API Geocoding Call for cities / global addresses
+    // 2. Debounced API Geocoding Call for cities / global addresses anywhere on Earth
     searchTimeoutRef.current = setTimeout(async () => {
       const geoResults = await searchGeocoding(q, userLocation);
       setIsSearching(false);
@@ -523,7 +671,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
         setSearchResults(combined);
       }
-    }, 350);
+    }, 300);
   };
 
   const handleSelectSearchResult = (item: {
@@ -574,8 +722,8 @@ export const MapView: React.FC<MapViewProps> = ({
           )}
         </div>
 
-        {/* Search Results Dropdown */}
-        {searchResults.length > 0 && (
+        {/* Search Results Dropdown & Worldwide Shortcuts */}
+        {searchResults.length > 0 ? (
           <div className="bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-2 shadow-2xl max-h-64 overflow-y-auto space-y-1">
             {searchResults.map((place) => (
               <button
@@ -600,9 +748,9 @@ export const MapView: React.FC<MapViewProps> = ({
               </button>
             ))}
           </div>
-        )}
+        ) : null}
 
-        {/* Categories Chips */}
+        {/* Categories Chips (Clean & Spacious) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
           {PLACE_CATEGORIES.map((cat) => {
             const isSelected = selectedCategory.key === cat.key;
@@ -622,31 +770,6 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })}
         </div>
-
-        {/* Phone Tracker Cluster & Density Badge (Dismissable) */}
-        {activeDrivers && activeDrivers.length > 0 && !isTrackerBadgeDismissed && (
-          <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-900/90 border border-emerald-500/50 rounded-xl text-xs backdrop-blur-md shadow-lg">
-            <div className="flex items-center gap-1.5 font-bold text-emerald-400">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>📱 {activeDrivers.length} Active Phone Trackers</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="text-[10px] font-mono text-slate-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
-                {activeDrivers.length >= 40 ? '🚦 Congestion Threshold (40-50): Jalan Sesak' : 'Standard 50 Radar'}
-              </div>
-              <button
-                onClick={() => setIsTrackerBadgeDismissed(true)}
-                className="text-slate-400 hover:text-white hover:bg-slate-800 p-1 rounded-lg transition-all text-xs font-black"
-                title="Tutup / Skip Info Badge Ini"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Live Traffic Jam Banner Alert (Dismissable & Skip/Close Button) */}
         {(() => {
@@ -700,6 +823,105 @@ export const MapView: React.FC<MapViewProps> = ({
 
       {/* Map Action Buttons (Right Side) */}
       <div id="map-action-buttons" className="absolute right-3 bottom-20 z-[1000] flex flex-col gap-2 items-end">
+        {/* GPS Trackable Devices & Icon Sizing Selector Popover */}
+        {showTrackerMenu && (
+          <div className="bg-slate-900/95 border border-slate-700/80 p-2.5 rounded-2xl shadow-2xl backdrop-blur-md mb-1 space-y-2 w-56 text-xs animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400">Alat Penjejak ({liveGpsObjects.length})</span>
+              <button
+                onClick={() => setShowGpsTrackers(!showGpsTrackers)}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${showGpsTrackers ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}
+              >
+                {showGpsTrackers ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            {[
+              { key: 'all', label: 'Semua Alat Penjejak', icon: '📡', count: liveGpsObjects.length },
+              { key: 'phone', label: 'Telefon Pintar (GPS)', icon: '📱', count: liveGpsObjects.filter(o => o.category === 'phone').length },
+              { key: 'rider', label: 'Rider & Motosikal', icon: '🛵', count: liveGpsObjects.filter(o => o.category === 'rider').length },
+              { key: 'fleet', label: 'Kenderaan / Lori', icon: '🚚', count: liveGpsObjects.filter(o => o.category === 'fleet').length },
+              { key: 'emergency', label: 'Ambulans & Kecemasan', icon: '🚨', count: liveGpsObjects.filter(o => o.category === 'emergency').length },
+              { key: 'tag', label: 'Tag Penjejak Aset', icon: '🏷️', count: liveGpsObjects.filter(o => o.category === 'tag').length },
+              { key: 'satellite', label: 'Satelit Orbit GPS', icon: '🛰️', count: liveGpsObjects.filter(o => o.category === 'satellite').length }
+            ].map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => setActiveCategoryFilter(cat.key)}
+                className={`w-full text-left px-2 py-1 rounded-xl font-bold flex items-center justify-between transition-all ${
+                  activeCategoryFilter === cat.key ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40' : 'text-slate-300 hover:bg-slate-800/80'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span>{cat.icon}</span>
+                  <span className="text-[11px] truncate max-w-[110px]">{cat.label}</span>
+                </span>
+                <span className="text-[10px] font-mono opacity-80">{cat.count}</span>
+              </button>
+            ))}
+
+            {/* Icon Size Scale & Animated Motion Controls */}
+            <div className="pt-2 border-t border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase">
+                <span>📐 Saiz Ikon</span>
+                <span className="text-cyan-400 font-mono">
+                  {iconScale === 'sm' ? 'Kecil (0.75x)' : iconScale === 'md' ? 'Sedang (1.0x)' : iconScale === 'lg' ? 'Besar (1.35x)' : 'XL (1.75x)'}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { key: 'sm', label: 'Kecil' },
+                  { key: 'md', label: 'Sedang' },
+                  { key: 'lg', label: 'Besar' },
+                  { key: 'xl', label: 'XL' }
+                ].map((sz) => (
+                  <button
+                    key={sz.key}
+                    onClick={() => handleSetIconScale(sz.key as any)}
+                    className={`py-1 text-[10px] font-black rounded-lg border transition-all text-center ${
+                      iconScale === sz.key
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow font-black'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    {sz.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Animated Motion Switch */}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-slate-400 font-bold">⚡ Gerakan Ikon</span>
+                <button
+                  onClick={handleToggleMotion}
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-lg border transition-all ${
+                    isAnimatedMotion ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                >
+                  {isAnimatedMotion ? 'AKTIF 🚀' : 'STATIK ⏸️'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* All GPS Trackable Devices Toggle Button */}
+        <button
+          onClick={() => setShowTrackerMenu(!showTrackerMenu)}
+          className={`relative w-12 h-12 rounded-2xl border flex items-center justify-center shadow-xl backdrop-blur-md transition-transform active:scale-95 ${
+            showGpsTrackers
+              ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-400 text-white'
+              : 'bg-slate-900/90 border-slate-700/80 text-emerald-400 hover:text-emerald-300'
+          }`}
+          title="Alat Penjejak GPS (Telefon, Rider, Kenderaan, Aset)"
+        >
+          <Radio className="w-6 h-6 animate-pulse" />
+          {showGpsTrackers && liveGpsObjects.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-emerald-400 text-slate-950 font-black text-[9px] px-1 rounded-full border border-slate-950 shadow">
+              {liveGpsObjects.length}
+            </span>
+          )}
+        </button>
+
         {/* Layer Selector Popover */}
         {showLayerMenu && (
           <div className="bg-slate-900/95 border border-slate-700/80 p-2 rounded-2xl shadow-2xl backdrop-blur-md mb-1 space-y-1 w-44 text-xs animate-in fade-in zoom-in-95 duration-150">

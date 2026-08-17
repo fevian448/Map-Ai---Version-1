@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Contributor, SettingsState } from '../types';
-import { Trophy, Mail, User, ShieldCheck, CheckCircle2, LogOut, KeyRound, Smartphone, Car, Bike, Sparkles, UserCheck, Bug, Code2, Plus, ThumbsUp, Lightbulb, Rocket } from 'lucide-react';
+import { Contributor, SettingsState, SubscriptionState } from '../types';
+import { Trophy, Mail, User, ShieldCheck, CheckCircle2, LogOut, KeyRound, Smartphone, Car, Bike, Sparkles, UserCheck, Bug, Code2, Plus, ThumbsUp, Lightbulb, Rocket, Crown, Zap, Check } from 'lucide-react';
 import { t } from '../lib/i18n';
 
 interface ProfileTabProps {
   contributors: Contributor[];
   settings: SettingsState;
+  subscription?: SubscriptionState;
+  onOpenUpgradeModal?: () => void;
+  onUpdateSubscription?: (sub: SubscriptionState) => void;
 }
 
 export interface UserProfileState {
@@ -40,7 +43,17 @@ interface AiIdeaItem {
   description: string;
 }
 
-export const ProfileTab: React.FC<ProfileTabProps> = ({ contributors, settings }) => {
+export const ProfileTab: React.FC<ProfileTabProps> = ({
+  contributors,
+  settings,
+  subscription = {
+    tier: 'FREE',
+    dailyQueriesLimit: 15,
+    queriesUsedToday: 0,
+    lastResetDate: new Date().toISOString().split('T')[0]
+  },
+  onOpenUpgradeModal
+}) => {
   const [profile, setProfile] = useState<UserProfileState>(() => {
     const saved = localStorage.getItem('mapai_user_profile');
     if (saved) {
@@ -363,6 +376,64 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ contributors, settings }
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Accuracy</div>
               </div>
             </div>
+          </div>
+
+          {/* Subscription Tier Status & Plan Perks Card */}
+          <div className={`rounded-3xl p-4 border space-y-3 shadow-xl transition-all ${
+            subscription.tier === 'PRO' || subscription.tier === 'ENTERPRISE'
+              ? 'bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/50'
+              : 'bg-slate-900 border-slate-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                  subscription.tier === 'PRO' || subscription.tier === 'ENTERPRISE'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : 'bg-slate-800 text-slate-300'
+                }`}>
+                  <Crown className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs uppercase font-black tracking-wider text-slate-200 flex items-center gap-1.5">
+                    <span>Pelan Semasa: {subscription.tier === 'PRO' ? 'MapAi PRO 💎' : subscription.tier === 'ENTERPRISE' ? 'Enterprise 🏢' : 'Free Tier ⚡'}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    {subscription.tier === 'FREE'
+                      ? `Penggunaan: ${subscription.queriesUsedToday} / 15 kuota AI harian`
+                      : 'Kuota AI Tanpa Had & Enjin Gemini Pro Aktif'}
+                  </div>
+                </div>
+              </div>
+
+              {onOpenUpgradeModal && (
+                <button
+                  onClick={onOpenUpgradeModal}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all shadow-md active:scale-95 ${
+                    subscription.tier === 'PRO' || subscription.tier === 'ENTERPRISE'
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                      : 'bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950'
+                  }`}
+                >
+                  {subscription.tier === 'FREE' ? '⚡ Naik Taraf PRO' : 'Urus Langganan'}
+                </button>
+              )}
+            </div>
+
+            {/* Quota Progress Bar for Free Tier */}
+            {subscription.tier === 'FREE' && (
+              <div className="space-y-1 pt-1">
+                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-amber-400 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, ((subscription.queriesUsedToday || 0) / 15) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>{15 - (subscription.queriesUsedToday || 0)} baki pertanyaan hari ini</span>
+                  <span>Reset setiap 24 jam</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Login Options Card */}

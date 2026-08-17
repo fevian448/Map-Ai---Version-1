@@ -13,7 +13,10 @@ import {
   CategoryKey,
   TrafficLevel,
   GeocodingResult,
-  AiProviderKey
+  AiProviderKey,
+  UserSubscriptionTier,
+  SubscriptionState,
+  GeospatialAnalysisResult
 } from '../types';
 
 export function haversine(a: GeoPoint, b: GeoPoint): number {
@@ -365,12 +368,86 @@ export async function searchGeocoding(
   return [];
 }
 
+export async function fetchTierStatus(userId = 'default_user'): Promise<SubscriptionState> {
+  try {
+    const res = await fetch(`/api/ai/tier-status?userId=${encodeURIComponent(userId)}`);
+    if (res.ok) {
+      const d = await res.json();
+      return {
+        tier: d.tier as UserSubscriptionTier,
+        dailyQueriesLimit: d.dailyQueriesLimit || (d.tier === 'FREE' ? 15 : Infinity),
+        queriesUsedToday: d.queriesUsedToday || 0,
+        lastResetDate: d.lastResetDate || new Date().toISOString().split('T')[0],
+        proExpiryDate: d.proExpiryDate,
+        isTrial: d.isTrial || false
+      };
+    }
+  } catch (_e) {}
+
+  // Local fallback
+  const localSaved = localStorage.getItem('mapai_subscription_tier');
+  const localTier: UserSubscriptionTier = (localSaved as any) || 'FREE';
+  const localCount = parseInt(localStorage.getItem('mapai_queries_today') || '0', 10);
+  return {
+    tier: localTier,
+    dailyQueriesLimit: localTier === 'FREE' ? 15 : 999999,
+    queriesUsedToday: localCount,
+    lastResetDate: new Date().toISOString().split('T')[0]
+  };
+}
+
+export async function upgradeUserTier(
+  userId = 'default_user',
+  targetTier: UserSubscriptionTier = 'PRO'
+): Promise<{ ok: boolean; message: string; tier: UserSubscriptionTier }> {
+  try {
+    const res = await fetch('/api/ai/upgrade-tier', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, targetTier })
+    });
+    if (res.ok) {
+      const d = await res.json();
+      localStorage.setItem('mapai_subscription_tier', d.tier);
+      return { ok: true, message: d.message, tier: d.tier };
+    }
+  } catch (_e) {}
+
+  localStorage.setItem('mapai_subscription_tier', targetTier);
+  return { ok: true, message: `Berjaya dinaik taraf ke ${targetTier}!`, tier: targetTier };
+}
+
+export async function fetchGeospatialAnalysis(
+  locationName: string,
+  point?: GeoPoint,
+  userId = 'default_user'
+): Promise<GeospatialAnalysisResult | null> {
+  try {
+    const res = await fetch('/api/ai/geospatial-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationName,
+        lat: point?.latitude,
+        lon: point?.longitude,
+        userId
+      })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (_e) {}
+  return null;
+}
+
 export async function sendChatMessage(
   content: string,
   provider: AiProviderKey = 'gemini_flash',
   apiKey?: string,
-  customEndpoint?: string
-): Promise<string> {
+  customEndpoint?: string,
+  userId = 'default_user',
+  tier?: UserSubscriptionTier
+): Promise<{ text: string; tier?: UserSubscriptionTier; queriesUsed?: number; remaining?: number; quotaExceeded?: boolean }> {
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -379,15 +456,25 @@ export async function sendChatMessage(
         messages: [{ role: 'user', content }],
         provider,
         apiKey,
-        customEndpoint
+        customEndpoint,
+        userId,
+        tier
       })
     });
-    if (res.ok) {
+    if (res.ok || res.status === 429) {
       const data = await res.json();
-      return data.content;
+      return {
+        text: data.content,
+        tier: data.tier,
+        queriesUsed: data.queriesUsedToday,
+        remaining: data.remainingQueries,
+        quotaExceeded: data.quotaExceeded
+      };
     }
   } catch (_e) {}
-  return "I'm having trouble connecting to the network right now. Please check your internet connection.";
+  return {
+    text: "I'm having trouble connecting to the network right now. Please check your internet connection."
+  };
 }
 
 export async function getDirectionsRoute(from: GeoPoint, to: GeoPoint): Promise<RouteInfo> {

@@ -12,7 +12,8 @@ import {
   SettingsState,
   AlertTypeKey,
   CategoryKey,
-  SystemLog
+  SystemLog,
+  SubscriptionState
 } from './types';
 import {
   fetchAlerts,
@@ -23,7 +24,8 @@ import {
   getDirectionsRoute,
   generateSpeedCameras,
   getWeatherInfo,
-  haversine
+  haversine,
+  fetchTierStatus
 } from './services/api';
 import { speakPrompt, playSpeedWarning } from './lib/audio';
 import { autoDownloadOfflineOnFirstInstall, getOfflineMapPackMeta } from './services/offlineMapStore';
@@ -44,6 +46,8 @@ import { FloatingAiCopilot } from './components/FloatingAiCopilot';
 import { GalleryVaultTab } from './components/GalleryVaultTab';
 import { GoogleWorkspaceHub } from './components/GoogleWorkspaceHub';
 import { GitLabHub } from './components/GitLabHub';
+import { SubscriptionModal } from './components/SubscriptionModal';
+import { GeospatialAiModal } from './components/GeospatialAiModal';
 import { Map, ShieldAlert, Gauge, Compass, Bot, Radio, User, Settings as SettingsIcon, Smartphone, Tv, HardDrive, Camera, Sparkles, Gitlab } from 'lucide-react';
 import { t } from './lib/i18n';
 import { ActiveDriver } from './types';
@@ -113,6 +117,35 @@ export function App() {
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
   const [tvModalOpen, setTvModalOpen] = useState<boolean>(false);
   const [appBuilderModalOpen, setAppBuilderModalOpen] = useState<boolean>(false);
+  const [subscriptionModalOpen, setSubscriptionModalOpen] = useState<boolean>(false);
+  const [geospatialModalOpen, setGeospatialModalOpen] = useState<boolean>(false);
+
+  // User Subscription & Rate Limit Quota State
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => {
+    const saved = localStorage.getItem('mapai_user_tier');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (_e) {}
+    }
+    return {
+      tier: 'FREE',
+      dailyQueriesLimit: 15,
+      queriesUsedToday: 0,
+      lastResetDate: new Date().toISOString().split('T')[0]
+    };
+  });
+
+  useEffect(() => {
+    fetchTierStatus('current_user')
+      .then((status) => {
+        setSubscription(status);
+        localStorage.setItem('mapai_user_tier', JSON.stringify(status));
+      })
+      .catch((_err) => {
+        // Fallback silently if offline
+      });
+  }, []);
 
   const [settings, setSettings] = useState<SettingsState>({
     serverUrl: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
@@ -147,22 +180,70 @@ export function App() {
     }
   }, [userLocation, addLog]);
 
-  // Get User Real Geolocation if available
+  // Get User Real Geolocation with Continuous Live GPS Watcher & Worldwide Fallback
   useEffect(() => {
+    let watchId: number | null = null;
+
+    const locateByIp = async () => {
+      try {
+        addLog('GPS', 'info', 'Attempting Worldwide IP Geolocation fallback...');
+        const res = await fetch('https://ipapi.co/json/');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.latitude && data.longitude) {
+            const loc = { latitude: data.latitude, longitude: data.longitude };
+            setUserLocation(loc);
+            addLog('GPS', 'success', `Worldwide Location acquired via IP (${data.city || 'City'}, ${data.country_name || 'World'}): [${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}]`);
+          }
+        }
+      } catch (_e) {
+        addLog('GPS', 'info', 'Using standard worldwide central coordinates');
+      }
+    };
+
     if ('geolocation' in navigator) {
-      addLog('PERMISSIONS', 'info', 'Requesting browser fine geolocation access...');
+      addLog('PERMISSIONS', 'info', 'Starting Continuous Real-Time GPS Tracking...');
+      
+      // 1. Immediate initial position fix
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
           setUserLocation(loc);
-          addLog('GPS', 'success', `GPS Location acquired: (${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)})`);
+          addLog('GPS', 'success', `Initial GPS fix acquired: (${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)})`);
         },
         (err) => {
-          addLog('GPS', 'warn', `GPS access warning: ${err.message || 'Using default location'}`);
+          addLog('GPS', 'warn', `GPS initial warning (${err.code}): ${err.message}. Triggering worldwide fallback...`);
+          locateByIp();
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
+
+      // 2. Continuous real-time location stream watcher
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          setUserLocation(loc);
+          if (pos.coords.speed !== null && pos.coords.speed > 0) {
+            setSpeedKmh(Math.round(pos.coords.speed * 3.6));
+          }
+        },
+        (err) => {
+          // Non-blocking watch warning
+          if (err.code === 1) {
+            addLog('GPS', 'warn', 'Location permission denied by user. Please allow Location in browser/device settings.');
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+      );
+    } else {
+      locateByIp();
     }
+
+    return () => {
+      if (watchId !== null && 'geolocation' in navigator) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
   }, [addLog]);
 
   // Fetch initial alerts, places, cameras, contributors, and active drivers
@@ -387,12 +468,30 @@ export function App() {
             places={places}
             onSelectDestination={handleSelectDestination}
             onStartNavigation={handleStartNavigation}
+            subscription={subscription}
+            onOpenUpgradeModal={() => setSubscriptionModalOpen(true)}
+            onOpenGeospatialModal={() => setGeospatialModalOpen(true)}
+            onUpdateSubscription={(sub) => {
+              setSubscription(sub);
+              localStorage.setItem('mapai_user_tier', JSON.stringify(sub));
+            }}
           />
         )}
 
         {activeTab === 'sos' && <SosTab userLocation={userLocation} settings={settings} />}
 
-        {activeTab === 'profile' && <ProfileTab contributors={contributors} settings={settings} />}
+        {activeTab === 'profile' && (
+          <ProfileTab
+            contributors={contributors}
+            settings={settings}
+            subscription={subscription}
+            onOpenUpgradeModal={() => setSubscriptionModalOpen(true)}
+            onUpdateSubscription={(sub) => {
+              setSubscription(sub);
+              localStorage.setItem('mapai_user_tier', JSON.stringify(sub));
+            }}
+          />
+        )}
 
         {activeTab === 'workspace' && (
           <GoogleWorkspaceHub
@@ -436,8 +535,44 @@ export function App() {
           onStartNavigation={handleStartNavigation}
           onAddLog={addLog}
           onToggleDock={() => updateSettings({ enableFloatingAi: false, floatingAiMode: 'docked' })}
+          subscription={subscription}
+          onOpenUpgradeModal={() => setSubscriptionModalOpen(true)}
+          onUpdateSubscription={(sub) => {
+            setSubscription(sub);
+            localStorage.setItem('mapai_user_tier', JSON.stringify(sub));
+          }}
         />
       )}
+
+      {/* Subscription / Plan Upgrade Modal */}
+      <SubscriptionModal
+        isOpen={subscriptionModalOpen}
+        onClose={() => setSubscriptionModalOpen(false)}
+        currentTier={subscription.tier}
+        onUpgradeSuccess={(newTier) => {
+          const updated: SubscriptionState = {
+            tier: newTier,
+            dailyQueriesLimit: newTier === 'PRO' || newTier === 'ENTERPRISE' ? 999999 : 15,
+            queriesUsedToday: subscription.queriesUsedToday,
+            lastResetDate: subscription.lastResetDate
+          };
+          setSubscription(updated);
+          localStorage.setItem('mapai_user_tier', JSON.stringify(updated));
+          addLog('AI', 'success', `User account successfully upgraded to ${newTier} plan!`);
+        }}
+      />
+
+      {/* Geospatial AI & Location Intelligence Modal */}
+      <GeospatialAiModal
+        isOpen={geospatialModalOpen}
+        onClose={() => setGeospatialModalOpen(false)}
+        userLocation={userLocation}
+        subscriptionTier={subscription.tier}
+        onOpenUpgradeModal={() => {
+          setGeospatialModalOpen(false);
+          setSubscriptionModalOpen(true);
+        }}
+      />
 
       {/* Report Modal */}
       {reportModalOpen && (

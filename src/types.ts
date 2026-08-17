@@ -188,6 +188,32 @@ export interface SystemLog {
   details?: any;
 }
 
+export type UserSubscriptionTier = 'FREE' | 'PRO' | 'ENTERPRISE';
+
+export interface SubscriptionState {
+  tier: UserSubscriptionTier;
+  dailyQueriesLimit: number;
+  queriesUsedToday: number;
+  lastResetDate: string;
+  proExpiryDate?: string;
+  isTrial?: boolean;
+}
+
+export interface GeospatialAnalysisResult {
+  id: string;
+  locationName: string;
+  point: GeoPoint;
+  footTrafficScore: number; // 0-100
+  commercialHotspotLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'PRIME_COMMERCIAL';
+  safetyAndRoadIndex: number; // 0-100
+  competitorDensity: string;
+  demographicSummary: string;
+  recommendedBusinessTypes: string[];
+  liveTrafficPrediction: string;
+  fullAiReport: string;
+  generatedAt: number;
+}
+
 export interface SettingsState {
   serverUrl: string;
   mapProvider: 'osm' | 'google' | 'nasa_gibs' | 'nasa_night';
